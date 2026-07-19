@@ -2,7 +2,12 @@
 
 **A private, single-file personal budgeting app that runs entirely in your browser.**
 
-Ledgerline replaces the monthly spreadsheet ritual. Import CSV files from your bank accounts and brokerages, let the rules engine categorize transactions automatically, and get a clear picture of your spending, savings, bills, and debt payoff — all in one HTML file, with no server, no account, and no data ever leaving your computer.
+Ledgerline replaces the monthly spreadsheet ritual to balance your budget and see how well, or poorly, you are meeting your goals. Import CSV files from your bank accounts and brokerages, let the rules engine categorize transactions automatically, and get a clear picture of your spending, savings, bills, and debt payoff — all in one HTML file, with no server, no account, and no data ever leaving your computer.
+
+<img width="1019" height="794" alt="image" src="https://github.com/user-attachments/assets/4c59d5b6-4a9e-4de9-91c3-1949ba6f1920" />
+
+## Hosted on GitHub 
+This app is hosted here on this GitHub repo via GitHub Pages, and you can take a look and play or use it from here. You can access it at https://jrothlander.github.io/LedgerLine/ or just download the /ledgerline-repo/repo/home-budget.html file and run it on your own machine. All of your data is stored on your browser and on your system. Nothing is saved to the server. Nothing is saved to or collected by the server. It is all safely retained in your browser and backed up on your system as you see fit. 
 
 ## Why Ledgerline
 
@@ -30,10 +35,6 @@ Most budgeting tools want your bank login, a subscription, or your data on their
 6. Set your income and budgets on **Budgets & Categories**, then explore the **Dashboard** and **This Month** tabs.
 
 The full walkthrough is in [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
-
-### Hosting it for others
-
-Because Ledgerline is a static file, you can serve it with GitHub Pages: enable Pages on this repository and anyone can use the app at your Pages URL without downloading anything. Each visitor's data stays in *their* browser — the page is served, but nothing is ever sent back.
 
 ## Privacy model
 
