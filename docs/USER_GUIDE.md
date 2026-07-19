@@ -35,11 +35,17 @@ Filter by month, account, or uncategorized-only. Each row lets you:
 - **＋ → Track as monthly bill** — adds the merchant to the This Month bills tracker with the expected amount and day taken from this transaction.
 - **Mo.** — override which budget month the transaction counts toward (see Paycheck timing below).
 
+<img width="1062" height="300" alt="image" src="https://github.com/user-attachments/assets/60563b4b-9556-412a-8c75-a164ac496776" />
+
+For these three transactions, I am going to set "Cammies Old Dutch Ice Cream" to the "Dining & Coffee" category. If this is a place I visit often, I am going to check the [+] button and set this as a rule. That way, the next time I visit, the rule will be applied, and it will automatically be categorized as "Dining & Coffee," which is really the main point of the software: to auto-categorize and track your spending. Now, for Packt Publishing, this is a subscription. So I set it to subscriptions and created it as a rule. If for some reason this showed up as on the 30th of the month, but I wanted to apply it to next month's budget, I would select the [auto] dropdown list and select "next", meaning that I want to apply this to next month. Same for if it showed up on the 1st and I wanted to apply to the previous month, I can set it to "prev". This is because some things show up a few days early or late, and you will want to adjust the time to apply it to your budget on a given month.
+
 ## Rules
 
-Rules live at the bottom of **Budgets & Categories**. Each rule is "if the description contains X, categorize as Y." They are checked **top to bottom and the first match wins**, so put specific rules (like `DHI MORTGAGE PAYROLL → Income`) above generic ones (like `MORTGAGE → Housing`). Use the arrows to reorder, ⤒ to send a rule to the top, and the **Test a description** box to paste a real description and see exactly which rule catches it — including when multiple rules match and order decides.
+Rules live at the bottom of **Budgets & Categories**. Each rule is "if the description contains X, categorize as Y." They are checked **top to bottom and the first match wins**, so put specific rules (like `ABC MORTGAGE PAYROLL → Income`) above generic ones (like `MORTGAGE → Housing`). This is necessary for me because I work for a mortgage company and I have a mortgage. So it tried to appy my paycheck as a mortgage payment until I added a rule to apply the payroll entry to Income and the Mortgage entry to housing. Use the arrows to reorder, ⤒ to send a rule to the top, and the **Test a description** box to paste a real description and see exactly which rule catches it — including when multiple rules match and order decides.
 
-Duplicate rules are blocked automatically. After editing rules you can **Apply rules to uncategorized**, or **Re-run rules on ALL transactions** (this overwrites manual category choices where a rule matches — it will ask first).
+Duplicate rules are blocked automatically. After editing rules, you can **Apply rules to uncategorized** or **Re-run rules on ALL transactions** (this overwrites manual category choices where a rule matches — it will ask first).
+
+<img width="1113" height="710" alt="image" src="https://github.com/user-attachments/assets/9488096c-ab27-409c-84ea-a4ae658ecc16" />
 
 ## This Month / Month in Review
 
@@ -57,6 +63,8 @@ The month selector defaults to the current month; pick any past month for the sa
 
 If a paycheck around the 30th really funds *next* month: on **Budgets & Categories → Income timing**, enable "count income dated on or after day N toward the next month" (25 is a good default for a paycheck due on the 30th that sometimes lands early). It applies to Income-categorized transactions only, including already-imported ones. Override any individual transaction with the **Mo.** control on Transactions — handy for the paycheck that lands oddly, or rent paid on the 31st for next month.
 
+<img width="1038" height="160" alt="image" src="https://github.com/user-attachments/assets/e151e1bc-e01c-48aa-8907-98fdf4254009" />
+
 ## Debt Plan
 
 Enter each debt's balance, APR, and minimum payment, plus how much extra you can pay monthly (the app hints at a realistic number from your actual Debt Payment transactions). Two strategies are simulated side by side:
@@ -66,9 +74,13 @@ Enter each debt's balance, APR, and minimum payment, plus how much extra you can
 
 You'll see debt-free dates, total interest, per-debt payoff order, the dollar value of your extra payment vs. minimums-only, and a balance-over-time chart. Balances are a snapshot you enter — update them monthly from your statements. If a minimum payment doesn't cover a debt's monthly interest, the app flags that the plan never finishes rather than showing misleading numbers.
 
+<img width="1061" height="830" alt="image" src="https://github.com/user-attachments/assets/848b17ab-aa60-4fe5-928f-4bb0c8cb9513" />
+
 ## Plan
 
 Automatic insights from your recent months: categories over budget and by how much, your savings rate vs. your target (default 20%), your three biggest spending levers with what a 10% trim frees up, subscription totals, and debt-payment framing.
+
+<img width="1067" height="704" alt="image" src="https://github.com/user-attachments/assets/84dc0046-98c4-43e8-911f-1703394e0122" />
 
 ## Backup, restore, and data
 
