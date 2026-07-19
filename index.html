@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledgerline — Personal Budget</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --paper:#FAFAF7;
+  --card:#FFFFFF;
+  --ink:#16211C;
+  --muted:#68716C;
+  --line:#E3E6E1;
+  --green:#1E5B45;
+  --green-soft:#E8F0EC;
+  --red:#B3382C;
+  --red-soft:#F8ECEA;
+  --gold:#B8922E;
+  --gold-soft:#F7F1E2;
+  --blue:#2C5B8F;
+  --blue-soft:#E9F0F7;
+  --radius:10px;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Public Sans',-apple-system,Segoe UI,Roboto,sans-serif;
+  --disp:'Archivo','Public Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.5;padding-bottom:80px}
+.wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+
+/* Header */
+header{border-bottom:3px double var(--ink);background:var(--card)}
+.head-inner{display:flex;align-items:baseline;justify-content:space-between;padding:22px 20px 14px;max-width:1060px;margin:0 auto;flex-wrap:wrap;gap:10px}
+.brand{font-family:var(--disp);font-weight:800;font-size:1.5rem;letter-spacing:-.02em}
+.brand em{font-style:normal;color:var(--green)}
+.tagline{font-family:var(--mono);font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
+
+/* Tabs */
+nav{display:flex;gap:2px;max-width:1060px;margin:0 auto;padding:0 20px;flex-wrap:wrap;background:var(--card)}
+nav button{appearance:none;border:none;background:none;font-family:var(--disp);font-weight:600;font-size:.9rem;padding:12px 16px;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px}
+nav button:hover{color:var(--ink)}
+nav button.active{color:var(--green);border-bottom-color:var(--green)}
+nav button:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+main{padding-top:26px}
+h2{font-family:var(--disp);font-weight:700;font-size:1.25rem;margin-bottom:4px;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:.88rem;margin-bottom:18px}
+h3{font-family:var(--disp);font-weight:600;font-size:1rem;margin:20px 0 8px}
+
+/* Statement strip — signature element */
+.statement{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--ink);border-radius:0 0 var(--radius) var(--radius);padding:18px 20px 8px;margin-bottom:22px}
+.statement-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--ink);padding-bottom:8px;flex-wrap:wrap;gap:8px}
+.statement-head .label{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+.statement-rows{font-family:var(--mono);font-size:.95rem}
+.st-row{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px dashed var(--line);gap:12px}
+.st-row:last-child{border-bottom:none}
+.st-row .k{color:var(--muted);font-size:.82rem;text-transform:uppercase;letter-spacing:.08em}
+.st-row .v{font-weight:600;font-variant-numeric:tabular-nums}
+.st-row .v.pos{color:var(--green)}
+.st-row .v.neg{color:var(--red)}
+.st-row.total{border-top:2px solid var(--ink);margin-top:2px}
+.st-row.total .k{color:var(--ink);font-weight:600}
+
+/* Cards / grid */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
+.card h3{margin-top:0}
+
+/* KPI */
+.kpi .num{font-family:var(--mono);font-size:1.45rem;font-weight:600;font-variant-numeric:tabular-nums}
+.kpi .lbl{font-family:var(--mono);font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.kpi .delta{font-size:.78rem;color:var(--muted)}
+
+/* Budget bars */
+.bar-row{margin-bottom:14px}
+.bar-top{display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:4px;gap:10px}
+.bar-top .amt{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;position:relative}
+.bar>span{display:block;height:100%;background:var(--green);border-radius:4px}
+.bar>span.over{background:var(--red)}
+.bar>span.warn{background:var(--gold)}
+.flag{display:inline-block;font-family:var(--mono);font-size:.66rem;padding:1px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.08em;vertical-align:1px}
+.flag.over{background:var(--red-soft);color:var(--red)}
+.flag.ok{background:var(--green-soft);color:var(--green)}
+.flag.warn{background:var(--gold-soft);color:var(--gold)}
+.flag.info{background:var(--blue-soft);color:var(--blue)}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th{font-family:var(--mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:left;padding:7px 8px;border-bottom:2px solid var(--ink)}
+td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.num.pos{color:var(--green)}
+td.num.neg{color:var(--red)}
+tr:hover td{background:#FBFBF8}
+.desc-cell{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trunc{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mo-sel{padding:4px 5px;font-size:.8rem}
+
+/* Row action menu */
+details.act{display:inline-block}
+details.act summary{list-style:none;cursor:pointer;border:1px solid var(--line);border-radius:7px;padding:2px 10px;font-family:var(--disp);font-weight:700;color:var(--muted);user-select:none}
+details.act summary::-webkit-details-marker{display:none}
+details.act summary:hover,details.act[open] summary{background:var(--green-soft);color:var(--green);border-color:var(--green)}
+.act-menu{position:fixed;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(22,33,28,.12);z-index:40;min-width:200px;padding:4px;display:flex;flex-direction:column}
+.act-menu button{appearance:none;border:none;background:none;text-align:left;font-family:var(--sans);font-size:.84rem;padding:8px 10px;border-radius:6px;cursor:pointer;color:var(--ink)}
+.act-menu button:hover{background:var(--green-soft);color:var(--green)}
+.act-menu .hint{font-size:.7rem;color:var(--muted);padding:0 10px 6px}
+
+/* Category sections on This Month */
+details.cat-sec{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px}
+details.cat-sec summary{list-style:none;cursor:pointer}
+details.cat-sec summary::-webkit-details-marker{display:none}
+details.cat-sec .chev{display:inline-block;transition:transform .12s;color:var(--muted);margin-right:6px;font-size:.8rem}
+details.cat-sec[open] .chev{transform:rotate(90deg)}
+details.cat-sec .cs-body{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+
+/* Forms */
+select,input[type=text],input[type=number],input[type=month]{font-family:var(--sans);font-size:.86rem;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink);max-width:100%}
+input[type=number]{font-family:var(--mono);text-align:right;width:110px}
+label{font-size:.82rem;color:var(--muted)}
+.btn{appearance:none;font-family:var(--disp);font-weight:600;font-size:.85rem;padding:9px 16px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
+.btn:hover{background:var(--green);border-color:var(--green)}
+.btn.ghost{background:none;color:var(--ink)}
+.btn.ghost:hover{background:var(--green-soft);color:var(--green);border-color:var(--green)}
+.btn.small{padding:4px 10px;font-size:.75rem}
+.btn.danger{border-color:var(--red);color:var(--red);background:none}
+.btn.danger:hover{background:var(--red-soft)}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.toolbar .spacer{flex:1}
+
+/* Dropzone */
+.dropzone{border:2px dashed var(--line);border-radius:var(--radius);padding:38px 20px;text-align:center;color:var(--muted);cursor:pointer;background:var(--card);transition:border-color .15s}
+.dropzone.drag,.dropzone:hover{border-color:var(--green);color:var(--green)}
+.dropzone .big{font-family:var(--disp);font-weight:600;font-size:1rem;color:inherit}
+
+/* Misc */
+.note{font-size:.8rem;color:var(--muted)}
+.pill{font-family:var(--mono);font-size:.7rem;background:var(--green-soft);color:var(--green);padding:2px 9px;border-radius:20px}
+.empty{padding:34px 20px;text-align:center;color:var(--muted);font-size:.9rem}
+.insight{border-left:3px solid var(--line);padding:10px 14px;margin-bottom:12px;background:var(--card);border-radius:0 8px 8px 0}
+.insight.red{border-left-color:var(--red)}
+.insight.green{border-left-color:var(--green)}
+.insight.gold{border-left-color:var(--gold)}
+.insight.blue{border-left-color:var(--blue)}
+.insight .t{font-weight:600;font-size:.9rem}
+.insight p{font-size:.85rem;color:var(--muted);margin-top:2px}
+.insight .m{font-family:var(--mono);color:var(--ink)}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:.85rem;padding:10px 18px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
+#toast.show{opacity:1}
+.chart-box{position:relative;height:260px}
+.mapping-grid{display:grid;grid-template-columns:150px 1fr;gap:10px 14px;align-items:center;margin:14px 0}
+footer{margin-top:40px;padding:16px 20px;border-top:1px solid var(--line);font-size:.75rem;color:var(--muted);text-align:center}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="head-inner">
+    <div class="brand">Ledger<em>line</em></div>
+    <div class="tagline">v13 · Private · runs only on this computer</div>
+  </div>
+  <nav id="nav">
+    <button data-view="dashboard" class="active">Dashboard</button>
+    <button data-view="month">This Month</button>
+    <button data-view="transactions">Transactions</button>
+    <button data-view="import">Import</button>
+    <button data-view="budgets">Budgets &amp; Categories</button>
+    <button data-view="plan">Plan</button>
+    <button data-view="debt">Debt Plan</button>
+    <button data-view="settings">Accounts &amp; Backup</button>
+  </nav>
+</header>
+<main class="wrap" id="main"></main>
+<div id="toast" role="status"></div>
+<script>
+/* ============ STATE & PERSISTENCE ============ */
+const LS_KEY='ledgerline.v1';
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+
+const DEFAULT_CATEGORIES=[
+  ['Income','income',0],
+  ['Groceries','spending',600],['Dining & Coffee','spending',250],['Gas & Auto','spending',300],
+  ['Housing','spending',1500],['Utilities','spending',300],['Insurance','spending',250],
+  ['Health','spending',150],['Shopping','spending',250],['Subscriptions','spending',60],
+  ['Entertainment','spending',100],['Travel','spending',100],['Personal & Family','spending',150],
+  ['Fees & Interest','spending',0],['Miscellaneous','spending',100],
+  ['Savings','savings',400],['Investing','investing',500],['Debt Payment','debt',300],
+  ['Transfer (ignore)','transfer',0]
+].map(([name,kind,budget])=>({id:uid(),name,kind,budget}));
+
+const DEFAULT_RULE_SEEDS=[
+  ['KROGER','Groceries'],['WALMART','Groceries'],['PUBLIX','Groceries'],['ALDI','Groceries'],
+  ['WINN-DIXIE','Groceries'],['WHOLE FOODS','Groceries'],['TRADER JOE','Groceries'],['ROUSES','Groceries'],
+  ['MCDONALD','Dining & Coffee'],['CHICK-FIL-A','Dining & Coffee'],['STARBUCKS','Dining & Coffee'],
+  ['TACO','Dining & Coffee'],['PIZZA','Dining & Coffee'],['DOORDASH','Dining & Coffee'],['UBER EATS','Dining & Coffee'],
+  ['SHELL','Gas & Auto'],['CHEVRON','Gas & Auto'],['EXXON','Gas & Auto'],['BP ','Gas & Auto'],
+  ['CIRCLE K','Gas & Auto'],['AUTOZONE','Gas & Auto'],['O\'REILLY','Gas & Auto'],
+  ['NETFLIX','Subscriptions'],['SPOTIFY','Subscriptions'],['HULU','Subscriptions'],['DISNEY','Subscriptions'],
+  ['APPLE.COM/BILL','Subscriptions'],['AMAZON PRIME','Subscriptions'],['YOUTUBE','Subscriptions'],
+  ['AMAZON','Shopping'],['TARGET','Shopping'],['AMZN','Shopping'],
+  ['ELECTRIC','Utilities'],['POWER','Utilities'],['WATER','Utilities'],['AT&T','Utilities'],
+  ['VERIZON','Utilities'],['T-MOBILE','Utilities'],['COMCAST','Utilities'],['XFINITY','Utilities'],
+  ['GEICO','Insurance'],['STATE FARM','Insurance'],['ALLSTATE','Insurance'],['PROGRESSIVE','Insurance'],
+  ['PHARMACY','Health'],['CVS','Health'],['WALGREENS','Health'],
+  ['MORTGAGE','Housing'],['RENT','Housing'],
+  ['ROBINHOOD','Investing'],['VANGUARD','Investing'],['FIDELITY','Investing'],['SCHWAB','Investing'],
+  ['401K','Investing'],['401(K)','Investing'],['ACORNS','Investing'],['BETTERMENT','Investing'],
+  ['PAYROLL','Income'],['DIRECT DEP','Income'],['DIRECT DEPOSIT','Income'],['SALARY','Income'],
+  ['INTEREST PAID','Income'],['INTEREST EARNED','Income'],
+  ['OVERDRAFT','Fees & Interest'],['SERVICE FEE','Fees & Interest'],['ATM FEE','Fees & Interest'],
+  ['ZELLE','Transfer (ignore)'],['ONLINE TRANSFER','Transfer (ignore)'],['TRANSFER TO','Transfer (ignore)'],['TRANSFER FROM','Transfer (ignore)']
+];
+
+let S=null;
+function freshState(){
+  const cats=DEFAULT_CATEGORIES.map(c=>({...c,id:uid()}));
+  const byName=Object.fromEntries(cats.map(c=>[c.name,c.id]));
+  return {
+    accounts:[],
+    categories:cats,
+    rules:DEFAULT_RULE_SEEDS.filter(([,n])=>byName[n]).map(([pattern,n])=>({id:uid(),pattern,categoryId:byName[n]})),
+    transactions:[],
+    mappings:{},
+    settings:{savingsTarget:20}
+  };
+}
+function load(){
+  try{const raw=localStorage.getItem(LS_KEY); S=raw?JSON.parse(raw):freshState();}
+  catch(e){S=freshState();}
+  if(!S.settings)S.settings={savingsTarget:20};
+  if(!S.settings.paydayShift)S.settings.paydayShift={enabled:false,fromDay:25};
+  if(!S.bills)S.bills={ignored:[],manual:[]};
+  if(!S.debts)S.debts=[];
+  if(!S.debtPlan)S.debtPlan={extra:0};
+  dedupeRules();
+}
+function save(){localStorage.setItem(LS_KEY,JSON.stringify(S));}
+
+/* ============ HELPERS ============ */
+const fmt=n=>{const v=Math.abs(n)<0.005?0:n;return v.toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2});};
+const fmt0=n=>n.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const catById=id=>S.categories.find(c=>c.id===id)||null;
+const acctById=id=>S.accounts.find(a=>a.id===id)||null;
+const monthKey=iso=>iso.slice(0,7);
+function shiftMonth(mk,delta){const[y,m]=mk.split('-').map(Number);const d=new Date(y,m-1+delta,1);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+/* Budget month a transaction counts toward. Per-transaction override (bshift) wins;
+   otherwise income dated on/after settings.paydayShift.fromDay rolls to next month when enabled. */
+function effMonth(t){
+  const base=monthKey(t.date);
+  if(t.bshift!=null)return shiftMonth(base,t.bshift);
+  const ps=S.settings.paydayShift;
+  if(ps&&ps.enabled){
+    const c=catById(t.categoryId);
+    if(c&&c.kind==='income'&&+t.date.slice(8,10)>=ps.fromDay)return shiftMonth(base,1);
+  }
+  return base;
+}
+const monthLabel=mk=>{const[y,m]=mk.split('-');return new Date(+y,+m-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});};
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600);}
+
+function parseDate(s){
+  if(!s)return null; s=String(s).trim();
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); // YYYY-MM-DD
+  if(m)return`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/); // MM/DD/YYYY or MM-DD-YY
+  if(m){let y=m[3];if(y.length===2)y='20'+y;return`${y}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;}
+  const d=new Date(s);
+  if(!isNaN(d))return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return null;
+}
+function parseAmount(s){
+  if(s==null||s==='')return null;
+  s=String(s).trim();
+  const neg=/^\(.*\)$/.test(s)||s.startsWith('-');
+  s=s.replace(/[()$,\s]/g,'').replace(/^-/,'');
+  const n=parseFloat(s);
+  if(isNaN(n))return null;
+  return neg?-n:n;
+}
+const txHash=t=>[t.accountId,t.date,t.amount.toFixed(2),t.desc.slice(0,60).toUpperCase()].join('|');
+const normPat=p=>String(p).trim().toUpperCase();
+function findRuleMatch(desc){
+  const D=String(desc).toUpperCase();
+  return S.rules.find(r=>D.includes(normPat(r.pattern)))||null;
+}
+function applyRules(desc){
+  const r=findRuleMatch(desc);
+  return r?r.categoryId:null;
+}
+function addRule(pattern,categoryId){
+  pattern=String(pattern).trim();
+  if(!pattern)return{ok:false,msg:'Rule text is empty.'};
+  if(!catById(categoryId))return{ok:false,msg:'Pick a category for the rule.'};
+  const dup=S.rules.find(r=>normPat(r.pattern)===normPat(pattern));
+  if(dup)return{ok:false,msg:`Duplicate — a rule for “${dup.pattern}” already exists (→ ${catById(dup.categoryId)?.name||'?'}).`};
+  const rule={id:uid(),pattern,categoryId};
+  S.rules.unshift(rule); // new rules go on top so they win over generic seeds
+  return{ok:true,rule};
+}
+function moveRule(id,delta){
+  const i=S.rules.findIndex(r=>r.id===id);
+  const j=i+delta;
+  if(i<0||j<0||j>=S.rules.length)return;
+  [S.rules[i],S.rules[j]]=[S.rules[j],S.rules[i]];
+}
+function dedupeRules(){
+  const seen=new Set();
+  S.rules=S.rules.filter(r=>{const k=normPat(r.pattern);if(!k||seen.has(k))return false;seen.add(k);return true;});
+}
+function allMonths(){
+  const set=new Set(S.transactions.map(effMonth));
+  return[...set].sort();
+}
+
+/* ============ MONTH MATH ============ */
+function computeMonth(mk){
+  const txs=S.transactions.filter(t=>effMonth(t)===mk);
+  const out={income:0,spending:0,savings:0,investing:0,debt:0,uncategorized:0,byCat:{},txCount:txs.length};
+  for(const t of txs){
+    const c=catById(t.categoryId);
+    if(!c){out.uncategorized++;continue;}
+    if(c.kind==='transfer')continue;
+    if(c.kind==='income'){out.income+=t.amount;continue;}
+    const net=-t.amount; // outflows are negative in storage, so net>0 means money out; refunds net against
+    if(c.kind==='spending'){out.spending+=net;out.byCat[c.id]=(out.byCat[c.id]||0)+net;}
+    else if(c.kind==='savings')out.savings+=net;
+    else if(c.kind==='investing')out.investing+=net;
+    else if(c.kind==='debt')out.debt+=net;
+  }
+  out.leftover=out.income-out.spending-out.savings-out.investing-out.debt;
+  out.savingsRate=out.income>0?100*(out.savings+out.investing)/out.income:0;
+  return out;
+}
+
+/* ============ BILLS ============ */
+const normBill=d=>String(d).toUpperCase().replace(/[0-9#*]+/g,' ').replace(/\s+/g,' ').trim().slice(0,26).trim();
+function currentMonthKey(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+function median(a){if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+/* A "bill" = an outflow whose normalized merchant appears in >=2 of the last 3 months,
+   about once per month. Expected amount = median of the last 3 charges; expected day = median day. */
+function detectBills(curMk){
+  const prevKeys=[1,2,3,4,5,6].map(i=>shiftMonth(curMk,-i));
+  const recent3=prevKeys.slice(0,3);
+  const groups={};
+  for(const t of S.transactions){
+    if(t.amount>=0)continue;
+    const c=catById(t.categoryId);
+    if(c&&c.kind==='transfer')continue;
+    const key=normBill(t.desc);
+    if(key.length<4)continue;
+    const em=effMonth(t);
+    if(em!==curMk&&!prevKeys.includes(em))continue;
+    (groups[key]=groups[key]||[]).push({t,em});
+  }
+  const bills=[];
+  for(const[key,list]of Object.entries(groups)){
+    if(S.bills.ignored.includes(key))continue;
+    if(S.bills.manual.some(mb=>key.includes(normPat(mb.pattern))||normPat(mb.pattern).includes(key)))continue;
+    const prev=list.filter(e=>e.em!==curMk);
+    const monthsHit=[...new Set(prev.map(e=>e.em))];
+    const recentHits=monthsHit.filter(mk=>recent3.includes(mk));
+    if(recentHits.length<2)continue;
+    if(prev.length/monthsHit.length>1.6)continue; // several charges per month => groceries/gas, not a bill
+    const ordered=[...prev].sort((a,b)=>a.t.date.localeCompare(b.t.date));
+    const amts=ordered.slice(-3).map(e=>-e.t.amount);
+    const days=prev.map(e=>+e.t.date.slice(8,10));
+    const catCounts={};prev.forEach(e=>{if(e.t.categoryId)catCounts[e.t.categoryId]=(catCounts[e.t.categoryId]||0)+1;});
+    const catId=Object.entries(catCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;
+    const paid=list.filter(e=>e.em===curMk).map(e=>e.t);
+    bills.push({key,name:key,detected:true,expAmt:median(amts),expDay:Math.round(median(days)),categoryId:catId,paid,monthsSeen:monthsHit.length});
+  }
+  for(const mb of S.bills.manual){
+    const paid=S.transactions.filter(t=>t.amount<0&&effMonth(t)===curMk&&t.desc.toUpperCase().includes(normPat(mb.pattern)));
+    bills.push({key:'manual:'+mb.id,mid:mb.id,name:mb.name,detected:false,expAmt:mb.amount,expDay:mb.day,categoryId:null,paid,monthsSeen:null});
+  }
+  bills.sort((a,b)=>a.expDay-b.expDay);
+  return bills;
+}
+function addManualBill(name,pattern,amount,day){
+  pattern=String(pattern).trim();name=String(name).trim();
+  if(!pattern||!name)return{ok:false,msg:'A bill needs a name and match text.'};
+  const dup=S.bills.manual.find(x=>normPat(x.pattern)===normPat(pattern));
+  if(dup)return{ok:false,msg:`Duplicate — “${dup.name}” already uses that match text.`};
+  const covering=S.bills.manual.find(x=>normPat(pattern).includes(normPat(x.pattern))||normPat(x.pattern).includes(normPat(pattern)));
+  if(covering)return{ok:false,msg:`Already tracked as “${covering.name}” — its match text overlaps.`};
+  const b={id:uid(),name,pattern,amount:Math.max(0,+amount||0),day:Math.min(31,Math.max(1,+day||1))};
+  S.bills.manual.push(b);
+  return{ok:true,bill:b};
+}
+/* Per-category current-month detail: what's happened, budget left, and what the
+   last 3 months of history suggest is still coming (total and purchase count). */
+function categoryMonthDetail(curMk){
+  const hist=[1,2,3].map(i=>shiftMonth(curMk,-i));
+  const out=[];
+  for(const cat of S.categories.filter(c=>c.kind==='spending')){
+    const cur=S.transactions.filter(t=>t.categoryId===cat.id&&effMonth(t)===curMk)
+      .sort((a,b)=>b.date.localeCompare(a.date));
+    const spent=cur.reduce((a,t)=>a-t.amount,0); // outflows negative; refunds net against
+    let hTot=0,hCnt=0,hMonths=0;
+    for(const mk of hist){
+      const txs=S.transactions.filter(t=>t.categoryId===cat.id&&effMonth(t)===mk);
+      if(txs.length){hMonths++;hTot+=txs.reduce((a,t)=>a-t.amount,0);hCnt+=txs.filter(t=>t.amount<0).length;}
+    }
+    const avgTot=hMonths?hTot/hMonths:0,avgCnt=hMonths?hCnt/hMonths:0;
+    if(!(cat.budget>0||spent>0.005||avgTot>0.005))continue;
+    const curCnt=cur.filter(t=>t.amount<0).length;
+    out.push({cat,txs:cur,spent,count:curCnt,avgTot,avgCnt,hMonths,
+      likelyMore:Math.max(0,avgTot-spent),
+      moreCnt:Math.max(0,Math.round(avgCnt-curCnt))});
+  }
+  out.sort((a,b)=>b.spent-a.spent||b.cat.budget-a.cat.budget);
+  return out;
+}
+
+/* ============ DEBT PAYOFF ============ */
+/* Standard rolling simulation: accrue monthly interest, pay minimums on every debt,
+   then send extra + all freed-up minimums to the target debt.
+   strategy 'snowball' targets smallest balance; 'avalanche' targets highest APR. */
+function simulatePayoff(debts,extra,strategy){
+  const ds=debts.filter(d=>d.balance>0.005).map(d=>({id:d.id,name:d.name,apr:+d.apr||0,minPayment:+d.minPayment||0,bal:+d.balance,interest:0,paidOffMonth:null}));
+  if(!ds.length)return{months:0,totalInterest:0,debts:[],series:[[0,0]],finished:true};
+  const pick=list=>strategy==='avalanche'
+    ?[...list].sort((a,b)=>b.apr-a.apr||a.bal-b.bal)[0]
+    :[...list].sort((a,b)=>a.bal-b.bal||b.apr-a.apr)[0];
+  let month=0,totalInterest=0;
+  const series=[[0,ds.reduce((a,d)=>a+d.bal,0)]];
+  while(ds.some(d=>d.bal>0.005)&&month<600){
+    month++;
+    for(const d of ds)if(d.bal>0.005){const i=d.bal*d.apr/100/12;d.bal+=i;d.interest+=i;totalInterest+=i;}
+    let budget=(+extra||0)+ds.reduce((a,d)=>a+(d.bal>0.005?d.minPayment:0),0);
+    for(const d of ds)if(d.bal>0.005){const p=Math.min(d.minPayment,d.bal);d.bal-=p;budget-=p;}
+    let active=ds.filter(d=>d.bal>0.005);
+    while(budget>0.005&&active.length){
+      const t=pick(active);
+      const p=Math.min(budget,t.bal);
+      t.bal-=p;budget-=p;
+      active=ds.filter(d=>d.bal>0.005);
+    }
+    for(const d of ds)if(d.bal<=0.005&&d.paidOffMonth==null)d.paidOffMonth=month;
+    series.push([month,ds.reduce((a,d)=>a+Math.max(0,d.bal),0)]);
+  }
+  return{months:month,totalInterest,debts:ds,series,finished:!ds.some(d=>d.bal>0.005)};
+}
+
+/* ============ BUDGET ALLOCATION ============ */
+/* Denominator for percentages: expected income (the Income category's budget) if set,
+   otherwise the 3-month average of actual income. */
+function budgetAllocation(){
+  const expectedIncome=S.categories.filter(c=>c.kind==='income').reduce((a,c)=>a+(+c.budget||0),0);
+  const curMk=currentMonthKey();
+  const hist=[1,2,3].map(i=>shiftMonth(curMk,-i)).map(computeMonth).filter(h=>h.income>0);
+  const avgIncome=hist.length?hist.reduce((a,h)=>a+h.income,0)/hist.length:0;
+  const base=expectedIncome>0?expectedIncome:avgIncome;
+  const kinds={spending:0,savings:0,investing:0,debt:0};
+  for(const c of S.categories)if(kinds[c.kind]!=null)kinds[c.kind]+=(+c.budget||0);
+  const total=kinds.spending+kinds.savings+kinds.investing+kinds.debt;
+  return{expectedIncome,avgIncome,base,kinds,total,pct:base>0?100*total/base:null,unallocated:base-total};
+}
+
+/* ============ CSV IMPORT ============ */
+let pending=null; // {fileName, headers, rows, accountId, mapping}
+function guessMapping(headers){
+  const H=headers.map(h=>h.toLowerCase());
+  const find=(...keys)=>{for(const k of keys){const i=H.findIndex(h=>h.includes(k));if(i>-1)return headers[i];}return'';};
+  const debit=find('debit','withdraw');
+  const credit=find('credit','deposit');
+  const amount=find('amount');
+  // ID needs care: bare substring 'id' would match 'paid'/'holiday'
+  let idCol='';
+  const idIdx=H.findIndex(h=>h==='id'||h==='ref'||h.includes('transaction id')||h.includes('reference')||h.includes('fitid')||h.includes('confirmation'));
+  if(idIdx>-1)idCol=headers[idIdx];
+  return{
+    dateCol:find('post date','transaction date','date'),
+    descCol:find('description','payee','merchant','memo','name','details'),
+    mode:(debit&&credit&&!amount)?'dc':'single',
+    amountCol:amount||'',
+    debitCol:debit,creditCol:credit,
+    idCol,
+    invert:false
+  };
+}
+function handleFiles(fileList){
+  const file=fileList&&fileList[0];
+  if(!file)return;
+  if(!pendingAccountId()){toast('Add an account first (Accounts & Backup), then pick it above.');return;}
+  Papa.parse(file,{header:true,skipEmptyLines:true,transformHeader:h=>h.trim(),complete:res=>{
+    const headers=res.meta.fields||[];
+    if(!headers.length||!res.data.length){toast('Could not read that CSV — no rows found.');return;}
+    const accountId=pendingAccountId();
+    const saved=S.mappings[accountId];
+    const mapping=saved&&headers.includes(saved.dateCol)?{...saved}:guessMapping(headers);
+    pending={fileName:file.name,headers,rows:res.data,accountId,mapping};
+    render();
+  },error:()=>toast('Could not parse that file as CSV.')});
+}
+const pendingAccountId=()=>document.getElementById('imp-acct')?.value||S._lastAcct||'';
+function normalizedRow(row,m){
+  const date=parseDate(row[m.dateCol]);
+  const desc=String(row[m.descCol]??'').trim();
+  const refId=m.idCol?String(row[m.idCol]??'').trim():'';
+  let amt=null;
+  if(m.mode==='dc'){
+    const d=parseAmount(row[m.debitCol]),c=parseAmount(row[m.creditCol]);
+    amt=(c||0)-(Math.abs(d||0));
+    if(d==null&&c==null)amt=null;
+  }else{amt=parseAmount(row[m.amountCol]);}
+  if(amt!=null&&m.invert)amt=-amt;
+  return{date,desc,amount:amt,refId};
+}
+function commitImport(){
+  const{rows,mapping,accountId}=pending;
+  /* Duplicate detection, strongest first:
+     1. Bank transaction ID (when the CSV has one): same account + same ID = same transaction.
+     2. Fingerprint with occurrence counting: account|date|amount|description. If a file lists
+        the same fingerprint twice, that's two real purchases — import as many copies as the
+        file shows, minus how many are already stored. Overlapping date-range re-downloads
+        therefore skip cleanly without ever eating a legitimate same-day twin. */
+  const dbIds=new Set();
+  const dbHashCount={};
+  for(const t of S.transactions){
+    if(t.refId)dbIds.add(t.accountId+'\u0000'+t.refId);
+    const h=txHash(t);dbHashCount[h]=(dbHashCount[h]||0)+1;
+  }
+  const fileHashCount={};
+  let added=0,dups=0,bad=0,auto=0;
+  for(const row of rows){
+    const n=normalizedRow(row,mapping);
+    if(!n.date||n.amount==null||!n.desc){bad++;continue;}
+    const t={id:uid(),accountId,date:n.date,desc:n.desc,amount:n.amount,categoryId:null};
+    if(n.refId){
+      const key=accountId+'\u0000'+n.refId;
+      if(dbIds.has(key)){dups++;continue;}
+      dbIds.add(key);t.refId=n.refId;
+    }else{
+      const h=txHash(t);
+      const occ=(fileHashCount[h]=(fileHashCount[h]||0)+1);
+      if((dbHashCount[h]||0)>=occ){dups++;continue;}
+    }
+    t.categoryId=applyRules(t.desc);
+    if(t.categoryId)auto++;
+    S.transactions.push(t);added++;
+  }
+  S.mappings[accountId]=mapping;S._lastAcct=accountId;
+  S.transactions.sort((a,b)=>b.date.localeCompare(a.date));
+  save();
+  const name=pending.fileName;pending=null;
+  toast(`${name}: imported ${added} (${auto} auto-categorized), skipped ${dups} duplicates${bad?`, ${bad} unreadable`:''}.`);
+  view= added?'transactions':'import';
+  if(added)txFilter={month:allMonths().slice(-1)[0]||'',account:'',onlyUncat:true};
+  render();
+}
+
+/* ============ RENDERING ============ */
+let view='dashboard';
+let dashMonth='';
+let tmMonth='';
+let txFilter={month:'',account:'',onlyUncat:false};
+let charts=[];
+const $=sel=>document.querySelector(sel);
+
+function render(){
+  charts.forEach(c=>c.destroy());charts=[];
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  const m=$('#main');
+  ({dashboard:rDash,month:rMonth,transactions:rTx,import:rImport,budgets:rBudgets,plan:rPlan,debt:rDebt,settings:rSettings})[view](m);
+}
+
+function monthOptions(sel){
+  const ms=allMonths().slice().reverse(); // newest first
+  return ms.map(mk=>`<option value="${mk}" ${mk===sel?'selected':''}>${monthLabel(mk)}</option>`).join('');
+}
+
+/* ---- Dashboard ---- */
+function rDash(m){
+  const ms=allMonths();
+  if(!ms.length){m.innerHTML=`<h2>Dashboard</h2><div class="empty">No transactions yet. Head to <b>Import</b> to load your first CSV — the dashboard builds itself from there.</div>`;return;}
+  if(!dashMonth||!ms.includes(dashMonth))dashMonth=ms[ms.length-1];
+  const c=computeMonth(dashMonth);
+  const prevIdx=ms.indexOf(dashMonth)-1;
+  const prev=prevIdx>=0?computeMonth(ms[prevIdx]):null;
+  const spendCats=S.categories.filter(x=>x.kind==='spending');
+  const rows=spendCats.map(cat=>({cat,spent:c.byCat[cat.id]||0})).filter(r=>r.spent>0.005||r.cat.budget>0)
+    .sort((a,b)=>b.spent-a.spent);
+  const overs=rows.filter(r=>r.cat.budget>0&&r.spent>r.cat.budget);
+
+  m.innerHTML=`
+  <div class="toolbar"><h2 style="margin:0">Dashboard</h2><div class="spacer"></div>
+    <label for="dash-month">Month</label><select id="dash-month">${monthOptions(dashMonth)}</select></div>
+
+  <div class="statement">
+    <div class="statement-head"><span class="label">Statement of the month</span><span class="label">${monthLabel(dashMonth)} · ${c.txCount} transactions</span></div>
+    <div class="statement-rows">
+      <div class="st-row"><span class="k">Income</span><span class="v pos">${fmt(c.income)}</span></div>
+      <div class="st-row"><span class="k">Spending</span><span class="v neg">−${fmt(c.spending)}</span></div>
+      <div class="st-row"><span class="k">Saved</span><span class="v">−${fmt(c.savings)}</span></div>
+      <div class="st-row"><span class="k">Invested</span><span class="v">−${fmt(c.investing)}</span></div>
+      <div class="st-row"><span class="k">Debt paid</span><span class="v">−${fmt(c.debt)}</span></div>
+      <div class="st-row total"><span class="k">Left over</span><span class="v ${c.leftover>=0?'pos':'neg'}">${fmt(c.leftover)}</span></div>
+    </div>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="card kpi"><div class="lbl">Savings + investing rate</div><div class="num">${c.savingsRate.toFixed(1)}%</div>
+      <div class="delta">target ${S.settings.savingsTarget}% of income ${c.savingsRate>=S.settings.savingsTarget?'<span class="flag ok">on track</span>':'<span class="flag warn">below</span>'}</div></div>
+    <div class="card kpi"><div class="lbl">Spending vs last month</div>
+      <div class="num">${prev?(c.spending-prev.spending>=0?'+':'−')+fmt0(Math.abs(c.spending-prev.spending)):'—'}</div>
+      <div class="delta">${prev?`was ${fmt0(prev.spending)} in ${monthLabel(ms[prevIdx])}`:'no prior month yet'}</div></div>
+    <div class="card kpi"><div class="lbl">Needs attention</div>
+      <div class="num">${overs.length}<span style="font-size:.9rem;font-weight:400"> over-budget</span></div>
+      <div class="delta">${c.uncategorized?`<a href="#" id="goto-uncat">${c.uncategorized} uncategorized →</a>`:'everything categorized ✓'}</div></div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card"><h3>Budgets — ${monthLabel(dashMonth)}</h3>
+      ${rows.length?rows.map(r=>{
+        const b=r.cat.budget,p=b>0?Math.min(100,100*r.spent/b):0;
+        const cls=b>0?(r.spent>b?'over':(r.spent>0.85*b?'warn':'')):'';
+        const flag=b>0?(r.spent>b?`<span class="flag over">over ${fmt0(r.spent-b)}</span>`:(r.spent>0.85*b?'<span class="flag warn">close</span>':'')):'<span class="flag info">no budget</span>';
+        return`<div class="bar-row"><div class="bar-top"><span>${esc(r.cat.name)} ${flag}</span><span class="amt">${fmt0(r.spent)}${b>0?` / ${fmt0(b)}`:''}</span></div>
+        <div class="bar"><span class="${cls}" style="width:${b>0?p:(r.spent>0?100:0)}%"></span></div></div>`;
+      }).join(''):'<div class="empty">No categorized spending this month yet.</div>'}
+      <p class="note">Set budgets in <b>Budgets &amp; Categories</b>.</p></div>
+    <div>
+      <div class="card" style="margin-bottom:16px"><h3>Where the money went</h3><div class="chart-box"><canvas id="pie"></canvas></div></div>
+      <div class="card"><h3>Six-month trend</h3><div class="chart-box"><canvas id="trend"></canvas></div></div>
+    </div>
+  </div>`;
+
+  $('#dash-month').onchange=e=>{dashMonth=e.target.value;render();};
+  const gu=$('#goto-uncat');if(gu)gu.onclick=e=>{e.preventDefault();view='transactions';txFilter={month:dashMonth,account:'',onlyUncat:true};render();};
+
+  const CSS=getComputedStyle(document.documentElement);
+  const palette=['#1E5B45','#2C5B8F','#B8922E','#B3382C','#5B8F7A','#7A6FB3','#8F6B2C','#4A4A4A','#2C8F8A','#B36B8F','#6B7570','#9AAF3C'];
+  if(rows.length){
+    charts.push(new Chart($('#pie'),{type:'doughnut',
+      data:{labels:rows.map(r=>r.cat.name),datasets:[{data:rows.map(r=>r.spent),backgroundColor:palette,borderWidth:1,borderColor:'#fff'}]},
+      options:{maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:10,font:{size:11}}}}}}));
+  }
+  const last6=ms.slice(-6);
+  const inc=last6.map(k=>computeMonth(k).income),sp=last6.map(k=>computeMonth(k).spending),sv=last6.map(k=>{const x=computeMonth(k);return x.savings+x.investing;});
+  charts.push(new Chart($('#trend'),{type:'line',
+    data:{labels:last6.map(k=>monthLabel(k).replace(' 20',' ’')),datasets:[
+      {label:'Income',data:inc,borderColor:'#1E5B45',backgroundColor:'#1E5B45',tension:.25},
+      {label:'Spending',data:sp,borderColor:'#B3382C',backgroundColor:'#B3382C',tension:.25},
+      {label:'Saved + invested',data:sv,borderColor:'#2C5B8F',backgroundColor:'#2C5B8F',tension:.25}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,font:{size:11}}}},scales:{y:{ticks:{callback:v=>'$'+(+v).toLocaleString()}}}}}));
+}
+
+/* ---- This Month ---- */
+function rMonth(m){
+  const nowMk=currentMonthKey();
+  const monthChoices=[...new Set([...allMonths().filter(mk=>mk<=nowMk),nowMk])].sort().reverse(); // current month first
+  if(!tmMonth||!monthChoices.includes(tmMonth))tmMonth=nowMk;
+  const curMk=tmMonth;
+  const isCur=curMk===nowMk;
+  const today=new Date();
+  const[cy,cm]=curMk.split('-').map(Number);
+  const dim=new Date(cy,cm,0).getDate();
+  const day=isCur?today.getDate():dim; // past months are complete
+  const c=computeMonth(curMk);
+  const totalBudget=S.categories.filter(x=>x.kind==='spending'&&x.budget>0).reduce((a,x)=>a+x.budget,0);
+  const bills=detectBills(curMk);
+  const paidBills=bills.filter(b=>b.paid.length);
+  const unpaid=bills.filter(b=>!b.paid.length);
+  const paidTotal=paidBills.reduce((a,b)=>a+b.paid.reduce((x,t)=>x-t.amount,0),0);
+  const remaining=unpaid.reduce((a,b)=>a+b.expAmt,0);
+  const expectedByNow=totalBudget*day/dim;
+  const pace=c.spending-expectedByNow;
+  const afterBills=c.income-c.spending-c.savings-c.investing-c.debt-(isCur?remaining:0);
+  const monthsOfData=allMonths().filter(mk=>mk<curMk).length;
+  const statusFor=b=>b.paid.length
+    ?`<span class="flag ok">paid</span>`
+    :isCur
+      ?(day>b.expDay+3?`<span class="flag warn">expected ~${ordinal(b.expDay)} — check</span>`:`<span class="flag info">due ~${ordinal(b.expDay)}</span>`)
+      :`<span class="flag warn">didn't post</span>`;
+
+  m.innerHTML=`
+  <div class="toolbar"><h2 style="margin:0">${isCur?'This Month':'Month in Review'} — ${monthLabel(curMk)}</h2><div class="spacer"></div>
+    <label for="tm-month">Month</label><select id="tm-month">${monthChoices.map(mk=>`<option value="${mk}" ${mk===curMk?'selected':''}>${monthLabel(mk)}${mk===nowMk?' (current)':''}</option>`).join('')}</select></div>
+  <p class="sub">${isCur?`Day ${day} of ${dim}. What's happened so far, and what your history says is still coming.`:`A completed month, reviewed with the same lens: how it finished against budget, and which bills posted.`}</p>
+  <div class="card" style="margin-bottom:16px">
+    ${isCur?`<div class="bar-top"><span>Month progress</span><span class="amt">${Math.round(100*day/dim)}%</span></div>
+    <div class="bar"><span style="width:${100*day/dim}%;background:var(--blue)"></span></div>
+    <div class="bar-top" style="margin-top:14px">`:`<div class="bar-top">`}<span>Spending vs total budget ${totalBudget>0?(isCur?(pace>25?'<span class="flag over">ahead of pace</span>':pace<-25?'<span class="flag ok">under pace</span>':'<span class="flag ok">on pace</span>'):(c.spending>totalBudget?'<span class="flag over">finished over</span>':'<span class="flag ok">finished under</span>')):''}</span>
+      <span class="amt">${fmt0(c.spending)} / ${fmt0(totalBudget)}</span></div>
+    <div class="bar"><span class="${totalBudget>0&&c.spending>totalBudget?'over':(isCur&&pace>25?'warn':'')}" style="width:${totalBudget>0?Math.min(100,100*c.spending/totalBudget):0}%"></span></div>
+    ${totalBudget>0?(isCur?`<p class="note" style="margin-top:8px">By day ${day} an even pace would be about ${fmt0(expectedByNow)}; you're at ${fmt0(c.spending)} (${pace>=0?'+':'−'}${fmt0(Math.abs(pace))}).</p>`:`<p class="note" style="margin-top:8px">The month closed ${c.spending>totalBudget?`<b style="color:var(--red)">${fmt0(c.spending-totalBudget)} over</b>`:`<b style="color:var(--green)">${fmt0(totalBudget-c.spending)} under</b>`} the total spending budget.</p>`):`<p class="note" style="margin-top:8px">Set category budgets in Budgets &amp; Categories to get a pace reading.</p>`}
+  </div>
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="card kpi"><div class="lbl">${isCur?'Income so far':'Income'}</div><div class="num">${fmt0(c.income)}</div><div class="delta">this budget month</div></div>
+    <div class="card kpi"><div class="lbl">Bills paid</div><div class="num">${paidBills.length}<span style="font-size:.9rem;font-weight:400"> of ${bills.length}</span></div><div class="delta">${fmt0(paidTotal)}${isCur?' so far':''}</div></div>
+    ${isCur?`<div class="card kpi"><div class="lbl">Still to come</div><div class="num">≈${fmt0(remaining)}</div><div class="delta">${unpaid.length} upcoming bill${unpaid.length===1?'':'s'}</div></div>`
+      :`<div class="card kpi"><div class="lbl">Left over</div><div class="num" style="color:${c.leftover>=0?'var(--green)':'var(--red)'}">${fmt0(c.leftover)}</div><div class="delta">income − spending − saving − debt</div></div>`}
+  </div>
+  ${bills.length?`<div class="card" style="margin-bottom:6px"><h3 style="margin-top:0">Monthly bills</h3>
+  <div style="overflow-x:auto"><table><thead><tr><th>Bill</th><th>Category</th><th>Status</th><th class="num">Expected</th><th class="num">Paid</th><th></th></tr></thead><tbody>
+  ${bills.map(b=>`<tr data-bkey="${esc(b.key)}">
+    <td>${esc(b.name)}${b.detected?'':' <span class="pill">manual</span>'}</td>
+    <td>${esc(catById(b.categoryId)?.name||'—')}</td>
+    <td>${statusFor(b)}${b.paid.length?` <span class="note" style="font-family:var(--mono)">${b.paid.map(t=>t.date.slice(5)).join(', ')}</span>`:''}</td>
+    <td class="num">≈${fmt0(b.expAmt)}</td>
+    <td class="num">${b.paid.length?fmt(b.paid.reduce((x,t)=>x-t.amount,0)):'—'}</td>
+    <td>${b.detected?`<button class="btn ghost small b-hide" title="Not a bill — hide it">hide</button>`:`<button class="btn danger small b-del">delete</button>`}</td>
+  </tr>`).join('')}
+  <tr><td colspan="3" style="font-weight:600">Total</td><td class="num" style="font-weight:600">≈${fmt0(bills.reduce((a,b)=>a+(b.paid.length?b.paid.reduce((x,t)=>x-t.amount,0):b.expAmt),0))}</td><td class="num" style="font-weight:600">${fmt0(paidTotal)}</td><td></td></tr>
+  </tbody></table></div>
+  <p class="note" style="margin-top:8px">Detected from charges that recur about monthly in your history; amounts are the recent median. ${S.bills.ignored.length?`<a href="#" id="b-unhide">${S.bills.ignored.length} hidden — restore</a>`:''}</p></div>`
+  :`<div class="empty">${monthsOfData<2?'Bills appear here automatically once you have about two months of imported history to learn from — or add them manually below.':'No recurring bills detected yet — add them manually below.'}</div>`}
+  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Add a bill manually</h3>
+    <div class="toolbar" style="margin-bottom:0">
+      <input type="text" id="mb-name" placeholder="Name (e.g. Electric)" style="width:150px">
+      <input type="text" id="mb-pattern" placeholder="Description contains…" style="font-family:var(--mono);flex:1;min-width:150px">
+      <input type="number" id="mb-amt" placeholder="Amount" min="0" step="5">
+      <label>day</label><input type="number" id="mb-day" min="1" max="31" value="1" style="width:60px">
+      <button class="btn" id="mb-add">Add bill</button>
+    </div>
+    <p class="note" style="margin-top:8px">For bills the detector misses — or just hit “+ bill” next to any transaction on the Transactions tab. It's marked paid when a charge containing the match text posts this month.</p></div>
+  ${(()=>{const cats=categoryMonthDetail(curMk);if(!cats.length)return'';
+    return`<h3 style="margin:24px 0 4px">Spending by category — where you stand</h3>
+    <p class="note" style="margin-bottom:12px">Everyday spending like gas and groceries doesn't arrive on a due date, so each envelope shows what's happened so far and what your recent history suggests is still coming. Click a category to see its transactions.</p>
+    ${cats.map(d=>{
+      const b=d.cat.budget,left=b-d.spent;
+      const pct=b>0?Math.min(100,100*d.spent/b):(d.spent>0?100:0);
+      const cls=b>0?(d.spent>b?'over':(d.spent>0.85*b?'warn':'')):'';
+      const flag=b>0?(d.spent>b?`<span class="flag over">over ${fmt0(d.spent-b)}</span>`
+        :(d.likelyMore>left+0.5?'<span class="flag warn">projected over</span>'
+        :(d.spent>0.85*b?'<span class="flag warn">close</span>':'<span class="flag ok">on track</span>')))
+        :'<span class="flag info">no budget</span>';
+      return`<details class="cat-sec">
+        <summary>
+          <div class="bar-top"><span><span class="chev">▶</span>${esc(d.cat.name)} ${flag}</span>
+            <span class="amt">${fmt0(d.spent)}${b>0?` / ${fmt0(b)}`:''}</span></div>
+          <div class="bar"><span class="${cls}" style="width:${pct}%"></span></div>
+          <div class="bar-top" style="margin-top:5px;margin-bottom:0"><span class="note">${d.count} purchase${d.count===1?'':'s'}${isCur?' so far':''}${d.hMonths?` · usually ≈${fmt0(d.avgTot)}/mo (${Math.round(d.avgCnt)} purchase${Math.round(d.avgCnt)===1?'':'s'})`:''}</span>
+            <span class="note" style="font-family:var(--mono)">${isCur&&d.hMonths?`≈${fmt0(d.likelyMore)} more likely${d.moreCnt?` (~${d.moreCnt})`:''}`:''}${b>0?`${isCur&&d.hMonths?' · ':''}${left>=0?fmt0(left)+(isCur?' left':' under'):fmt0(-left)+' over'}`:''}</span></div>
+        </summary>
+        <div class="cs-body">
+          ${d.txs.length?`<table><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th></tr></thead><tbody>
+          ${d.txs.slice(0,40).map(t=>`<tr><td style="font-family:var(--mono);white-space:nowrap">${t.date}</td><td class="desc-cell" title="${esc(t.desc)}">${esc(t.desc)}</td><td class="num ${t.amount>=0?'pos':'neg'}">${fmt(t.amount)}</td></tr>`).join('')}
+          ${d.txs.length>40?`<tr><td colspan="3" class="note">…and ${d.txs.length-40} more — see the Transactions tab.</td></tr>`:''}
+          </tbody></table>`:'<p class="note">No transactions in this category yet this month.</p>'}
+          ${d.hMonths?`<p class="note" style="margin-top:8px">${isCur?`History (last ${d.hMonths} month${d.hMonths===1?'':'s'} with activity): ≈${fmt0(d.avgTot)}/mo across ~${Math.round(d.avgCnt)} purchases. At that pace expect ≈${fmt0(d.likelyMore)} more this month${b>0?`, which would finish at ≈${fmt0(d.spent+d.likelyMore)} vs your ${fmt0(b)} budget`:''}.`:`Finished at ${fmt0(d.spent)}${b>0?` vs the ${fmt0(b)} budget`:''} — vs ≈${fmt0(d.avgTot)}/mo average over the ${d.hMonths} prior month${d.hMonths===1?'':'s'} with activity.`}</p>`:''}
+        </div>
+      </details>`;}).join('')}`;})()}
+  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">${isCur?'After the bills':'How the month closed'}</h3>
+    ${isCur?`<p style="font-size:.9rem">Income received so far (${fmt0(c.income)}) minus everything already out (${fmt0(c.spending+c.savings+c.investing+c.debt)}) minus expected upcoming bills (≈${fmt0(remaining)}) leaves <b style="font-family:var(--mono);color:${afterBills>=0?'var(--green)':'var(--red)'}">≈${fmt0(afterBills)}</b> flexible.</p>
+    <p class="note">Early in the month this can look tight or negative until your later paycheck arrives — that's normal.</p>`
+    :`<p style="font-size:.9rem">Income ${fmt0(c.income)} − spending ${fmt0(c.spending)} − saved ${fmt0(c.savings)} − invested ${fmt0(c.investing)} − debt payments ${fmt0(c.debt)} = <b style="font-family:var(--mono);color:${c.leftover>=0?'var(--green)':'var(--red)'}">${fmt0(c.leftover)}</b> left over.</p>
+    <p class="note">${c.leftover>50?'Money left unassigned tends to get absorbed — if this repeats, consider raising your savings or debt budgets.':c.leftover<-50?'Outflows beat income this month — check for one-time items or a miscategorized transfer.':'A tight, fully-used month.'}</p>`}</div>`;
+
+  $('#tm-month').onchange=e=>{tmMonth=e.target.value;render();};
+  m.querySelectorAll('tr[data-bkey]').forEach(tr=>{
+    const key=tr.dataset.bkey;
+    const hide=tr.querySelector('.b-hide');
+    if(hide)hide.onclick=()=>{S.bills.ignored.push(key);save();toast('Hidden — it won\'t be treated as a bill.');render();};
+    const del=tr.querySelector('.b-del');
+    if(del)del.onclick=()=>{S.bills.manual=S.bills.manual.filter(x=>'manual:'+x.id!==key);save();render();};
+  });
+  const uh=$('#b-unhide');if(uh)uh.onclick=e=>{e.preventDefault();S.bills.ignored=[];save();toast('Hidden bills restored.');render();};
+  $('#mb-add').onclick=()=>{
+    const res=addManualBill($('#mb-name').value,$('#mb-pattern').value,+$('#mb-amt').value||0,+$('#mb-day').value||1);
+    if(!res.ok){toast(res.msg);return;}
+    save();toast('Bill added.');render();};
+}
+const ordinal=n=>n+(['th','st','nd','rd'][(n%100>10&&n%100<14)?0:Math.min(n%10,4)]||'th');
+
+/* ---- Transactions ---- */
+function rTx(m){
+  const ms=allMonths();
+  if(txFilter.month&&!ms.includes(txFilter.month))txFilter.month='';
+  let txs=S.transactions.slice();
+  if(txFilter.month)txs=txs.filter(t=>effMonth(t)===txFilter.month);
+  if(txFilter.account)txs=txs.filter(t=>t.accountId===txFilter.account);
+  if(txFilter.onlyUncat)txs=txs.filter(t=>!t.categoryId);
+  const catOpts=cid=>`<option value="">— pick —</option>`+S.categories.map(c=>`<option value="${c.id}" ${c.id===cid?'selected':''}>${esc(c.name)}</option>`).join('');
+
+  m.innerHTML=`
+  <h2>Transactions</h2><p class="sub">Fix any category and Ledgerline can turn it into a rule so next month is automatic. Spot a mortgage, utility, or subscription? “+ bill” tracks it on the This Month tab.</p>
+  <div class="toolbar">
+    <select id="f-month"><option value="">All months</option>${monthOptions(txFilter.month)}</select>
+    <select id="f-acct"><option value="">All accounts</option>${S.accounts.map(a=>`<option value="${a.id}" ${a.id===txFilter.account?'selected':''}>${esc(a.name)}</option>`).join('')}</select>
+    <label><input type="checkbox" id="f-uncat" ${txFilter.onlyUncat?'checked':''}> uncategorized only</label>
+    <div class="spacer"></div>
+    <button class="btn ghost small" id="reapply">Apply rules to uncategorized</button>
+  </div>
+  ${txs.length?`<div class="card" style="padding:0;overflow-x:auto"><table><thead><tr>
+    <th>Date</th><th title="Which month this counts toward">Mo.</th><th>Account</th><th>Description</th><th class="num">Amount</th><th>Category</th><th></th></tr></thead><tbody>
+    ${txs.slice(0,400).map(t=>{const em=effMonth(t),shifted=em!==monthKey(t.date);return`<tr data-id="${t.id}">
+      <td style="font-family:var(--mono);white-space:nowrap">${t.date}</td>
+      <td style="white-space:nowrap"><select class="mo-sel" title="Which month this counts toward${shifted?` (currently ${monthLabel(em)})`:''}">
+        <option value="" ${t.bshift==null?'selected':''}>auto</option>
+        <option value="0" ${t.bshift===0?'selected':''}>same</option>
+        <option value="1" ${t.bshift===1?'selected':''}>next</option>
+        <option value="-1" ${t.bshift===-1?'selected':''}>prev</option></select>${shifted?`<span class="flag info" title="Counts toward ${monthLabel(em)}">→${monthLabel(em).slice(0,3)}</span>`:''}</td>
+      <td class="trunc" title="${esc(acctById(t.accountId)?.name||'?')}">${esc(acctById(t.accountId)?.name||'?')}</td>
+      <td class="desc-cell" title="${esc(t.desc)}">${esc(t.desc)}</td>
+      <td class="num ${t.amount>=0?'pos':'neg'}">${fmt(t.amount)}</td>
+      <td><select class="cat-sel">${catOpts(t.categoryId)}</select></td>
+      <td><details class="act"><summary title="Actions">＋</summary><div class="act-menu">
+        <button class="rule-btn">Create category rule…</button>
+        <button class="bill-btn">Track as monthly bill…</button>
+      </div></details></td>
+    </tr>`;}).join('')}
+  </tbody></table></div>${txs.length>400?`<p class="note">Showing first 400 of ${txs.length} — narrow the filters to see more.</p>`:''}`
+  :`<div class="empty">Nothing matches these filters.</div>`}`;
+
+  m.querySelectorAll('details.act').forEach(d=>{
+    const menu=d.querySelector('.act-menu');
+    d.addEventListener('toggle',()=>{
+      if(!d.open)return;
+      document.querySelectorAll('details.act[open]').forEach(o=>{if(o!==d)o.open=false;});
+      const r=d.querySelector('summary').getBoundingClientRect();
+      const mw=210;
+      menu.style.top=Math.min(window.innerHeight-100,r.bottom+4)+'px';
+      menu.style.left=Math.max(8,Math.min(window.innerWidth-mw-8,r.right-mw))+'px';
+    });
+  });
+  $('#f-month').onchange=e=>{txFilter.month=e.target.value;render();};
+  $('#f-acct').onchange=e=>{txFilter.account=e.target.value;render();};
+  $('#f-uncat').onchange=e=>{txFilter.onlyUncat=e.target.checked;render();};
+  $('#reapply').onclick=()=>{let n=0;for(const t of S.transactions){if(!t.categoryId){const c=applyRules(t.desc);if(c){t.categoryId=c;n++;}}}save();toast(`Categorized ${n} transaction${n===1?'':'s'} from rules.`);render();};
+  m.querySelectorAll('tr[data-id]').forEach(tr=>{
+    const t=S.transactions.find(x=>x.id===tr.dataset.id);
+    const act=tr.querySelector('details.act');
+    const closeMenu=()=>{act.open=false;};
+    tr.querySelector('.mo-sel').onchange=e=>{
+      const v=e.target.value;
+      if(v==='')delete t.bshift;else t.bshift=+v;
+      save();toast(`Counts toward ${monthLabel(effMonth(t))}.`);render();};
+    tr.querySelector('.cat-sel').onchange=e=>{t.categoryId=e.target.value||null;save();toast(`Categorized as ${catById(t.categoryId)?.name||'—'}. Tip: “+ rule” makes it automatic.`);};
+    tr.querySelector('.rule-btn').onclick=()=>{
+      closeMenu();
+      if(!t.categoryId){toast('Pick a category for this transaction first.');return;}
+      const suggestion=t.desc.replace(/\d{3,}.*$/,'').trim().slice(0,24).trim()||t.desc.slice(0,24);
+      const pattern=prompt(`Create a rule: any description containing this text will be categorized as “${catById(t.categoryId).name}”.\n\nEdit the match text if needed:`,suggestion);
+      if(!pattern)return;
+      const res=addRule(pattern,t.categoryId);
+      if(!res.ok){toast(res.msg);return;}
+      let n=0;for(const x of S.transactions){if(!x.categoryId&&x.desc.toUpperCase().includes(normPat(pattern))){x.categoryId=t.categoryId;n++;}}
+      save();toast(`Rule saved${n?` — categorized ${n} more transaction${n===1?'':'s'}`:''}.`);render();
+    };
+    tr.querySelector('.bill-btn').onclick=()=>{
+      closeMenu();
+      if(t.amount>=0){toast('Bills are payments — pick an outgoing transaction.');return;}
+      const already=S.bills.manual.find(mb=>t.desc.toUpperCase().includes(normPat(mb.pattern)));
+      if(already){toast(`Already tracked as “${already.name}” on This Month.`);return;}
+      const suggestion=t.desc.replace(/\d{3,}.*$/,'').trim().slice(0,24).trim()||t.desc.slice(0,24);
+      const pattern=prompt(`Track as a monthly bill on the This Month tab.\n\nAny charge containing this text will count as this bill — edit if needed:`,suggestion);
+      if(!pattern)return;
+      const defName=pattern.trim().toLowerCase().replace(/\b\w/g,ch=>ch.toUpperCase());
+      const name=prompt('Name for this bill (e.g. Electric, Internet):',defName);
+      if(!name)return;
+      const res=addManualBill(name,pattern,-t.amount,+t.date.slice(8,10));
+      if(!res.ok){toast(res.msg);return;}
+      save();toast(`“${res.bill.name}” added — expected ≈${fmt0(res.bill.amount)} around the ${ordinal(res.bill.day)}.`);
+    };
+  });
+}
+
+/* ---- Import ---- */
+function rImport(m){
+  if(!S.accounts.length){
+    m.innerHTML=`<h2>Import</h2><div class="empty">First, add your accounts (both checking, savings, Robinhood, 401k…) under <b>Accounts &amp; Backup</b>. Then come back here to load their CSVs.</div>
+    <div style="text-align:center"><button class="btn" id="go-acct">Set up accounts</button></div>`;
+    $('#go-acct').onclick=()=>{view='settings';render();};return;
+  }
+  if(pending){rMapping(m);return;}
+  m.innerHTML=`
+  <h2>Import a CSV</h2><p class="sub">Download the CSV from your bank or broker, pick which account it belongs to, and drop it below. Ledgerline remembers each account's column layout after the first import.</p>
+  <div class="toolbar"><label for="imp-acct">This file is from</label>
+    <select id="imp-acct">${S.accounts.map(a=>`<option value="${a.id}" ${a.id===S._lastAcct?'selected':''}>${esc(a.name)}</option>`).join('')}</select></div>
+  <div class="dropzone" id="dz" tabindex="0" role="button" aria-label="Choose or drop a CSV file">
+    <div class="big">Drop the CSV here</div>
+    <div>or click to choose a file</div>
+  </div>
+  <input type="file" id="file-inp" accept=".csv,text/csv" style="display:none">
+  <p class="note" style="margin-top:12px">Overlapping date ranges are safe: previously imported transactions are recognized and skipped — by your bank's transaction ID when the file has one, otherwise by date, description, and amount (counting copies, so two identical same-day purchases both import).</p>`;
+  const dz=$('#dz'),fi=$('#file-inp');
+  dz.onclick=()=>fi.click();
+  dz.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')fi.click();};
+  fi.onchange=()=>handleFiles(fi.files);
+  ['dragover','dragenter'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
+  dz.addEventListener('drop',e=>handleFiles(e.dataTransfer.files));
+}
+function rMapping(m){
+  const{headers,rows,mapping,fileName}=pending;
+  const opt=sel=>`<option value="">—</option>`+headers.map(h=>`<option ${h===sel?'selected':''}>${esc(h)}</option>`).join('');
+  const preview=rows.slice(0,5).map(r=>normalizedRow(r,mapping));
+  m.innerHTML=`
+  <h2>Check the columns</h2><p class="sub">${esc(fileName)} → <b>${esc(acctById(pending.accountId)?.name)}</b> · ${rows.length} rows. Confirm which column is which, then import.</p>
+  <div class="card">
+    <div class="mapping-grid">
+      <label>Date column</label><select id="m-date">${opt(mapping.dateCol)}</select>
+      <label>Description column</label><select id="m-desc">${opt(mapping.descCol)}</select>
+      <label>Amount layout</label><select id="m-mode">
+        <option value="single" ${mapping.mode==='single'?'selected':''}>One amount column (+/−)</option>
+        <option value="dc" ${mapping.mode==='dc'?'selected':''}>Separate debit &amp; credit columns</option></select>
+      ${mapping.mode==='single'
+        ?`<label>Amount column</label><select id="m-amt">${opt(mapping.amountCol)}</select>`
+        :`<label>Debit (money out)</label><select id="m-deb">${opt(mapping.debitCol)}</select>
+          <label>Credit (money in)</label><select id="m-cred">${opt(mapping.creditCol)}</select>`}
+      <label>Transaction ID <span class="note">(optional)</span></label><select id="m-id">${opt(mapping.idCol||'')}</select>
+      <label>Flip signs</label><label><input type="checkbox" id="m-inv" ${mapping.invert?'checked':''}> positive numbers in this file mean money <i>out</i></label>
+    </div>
+    <h3>Preview (money out should show red)</h3>
+    <table><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th></tr></thead><tbody>
+      ${preview.map(p=>`<tr><td style="font-family:var(--mono)">${p.date||'<span style="color:var(--red)">?</span>'}</td><td class="desc-cell">${esc(p.desc)||'?'}</td>
+      <td class="num ${p.amount>=0?'pos':'neg'}">${p.amount==null?'?':fmt(p.amount)}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="toolbar" style="margin-top:16px;margin-bottom:0">
+      <button class="btn" id="do-import">Import ${rows.length} rows</button>
+      <button class="btn ghost" id="cancel-import">Cancel</button>
+    </div>
+  </div>`;
+  const re=()=>{render();};
+  $('#m-date').onchange=e=>{pending.mapping.dateCol=e.target.value;re();};
+  $('#m-desc').onchange=e=>{pending.mapping.descCol=e.target.value;re();};
+  $('#m-mode').onchange=e=>{pending.mapping.mode=e.target.value;re();};
+  const ma=$('#m-amt');if(ma)ma.onchange=e=>{pending.mapping.amountCol=e.target.value;re();};
+  const md=$('#m-deb');if(md)md.onchange=e=>{pending.mapping.debitCol=e.target.value;re();};
+  const mc=$('#m-cred');if(mc)mc.onchange=e=>{pending.mapping.creditCol=e.target.value;re();};
+  const mi=$('#m-id');if(mi)mi.onchange=e=>{pending.mapping.idCol=e.target.value;re();};
+  $('#m-inv').onchange=e=>{pending.mapping.invert=e.target.checked;re();};
+  $('#do-import').onclick=commitImport;
+  $('#cancel-import').onclick=()=>{pending=null;render();};
+}
+
+/* ---- Budgets & Categories ---- */
+function rBudgets(m){
+  const kinds=[['income','Income'],['spending','Spending'],['savings','Savings'],['investing','Investing'],['debt','Debt payment'],['transfer','Transfer (ignored)']];
+  const kindOpts=k=>kinds.map(([v,l])=>`<option value="${v}" ${v===k?'selected':''}>${l}</option>`).join('');
+  const alloc=budgetAllocation();
+  const pctCell=c=>{
+    if(c.kind==='transfer')return'—';
+    if(c.kind==='income')return c.budget>0?'<span class="note">expected income</span>':'—';
+    if(!(c.budget>0))return'—';
+    return alloc.base>0?(100*c.budget/alloc.base).toFixed(1)+'%':'—';
+  };
+  m.innerHTML=`
+  <h2>Budgets &amp; Categories</h2><p class="sub">Set the <b>Income</b> row's budget to your expected monthly income, then budget every other category as a slice of it. Spending, savings, investing, and debt budgets all claim income — together they should never pass 100%.</p>
+  <div class="card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Category</th><th>Type</th><th class="num">Monthly budget</th><th class="num">% of income</th><th></th></tr></thead><tbody>
+  ${S.categories.map(c=>`<tr data-id="${c.id}">
+    <td><input type="text" class="c-name" value="${esc(c.name)}" style="width:180px"></td>
+    <td><select class="c-kind">${kindOpts(c.kind)}</select></td>
+    <td class="num"><input type="number" class="c-budget" min="0" step="10" value="${c.budget||0}" ${c.kind==='transfer'?'disabled':''} ${c.kind==='income'?'placeholder="expected /mo"':''}></td>
+    <td class="num">${pctCell(c)}</td>
+    <td><button class="btn danger small c-del">delete</button></td></tr>`).join('')}
+  <tr><td style="font-weight:600">Total budgeted</td><td></td>
+    <td class="num" style="font-weight:600">${fmt0(alloc.total)}</td>
+    <td class="num" style="font-weight:600;${alloc.pct!=null&&alloc.pct>100?'color:var(--red)':''}">${alloc.pct!=null?alloc.pct.toFixed(1)+'%':'—'}</td><td></td></tr>
+  </tbody></table></div>
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin-top:0">Allocation vs income ${alloc.pct==null?'':alloc.pct>100?'<span class="flag over">over 100%</span>':alloc.pct>97?'<span class="flag ok">fully allocated</span>':'<span class="flag ok">fits</span>'}</h3>
+    ${alloc.base>0?`
+    <div class="bar-top"><span>Spending ${fmt0(alloc.kinds.spending)} · Savings ${fmt0(alloc.kinds.savings)} · Investing ${fmt0(alloc.kinds.investing)} · Debt ${fmt0(alloc.kinds.debt)}</span>
+      <span class="amt">${fmt0(alloc.total)} / ${fmt0(alloc.base)}</span></div>
+    <div class="bar" style="height:12px"><span class="${alloc.pct>100?'over':''}" style="width:${Math.min(100,alloc.pct)}%"></span></div>
+    <p class="note" style="margin-top:8px">${alloc.pct>100
+      ?`You've budgeted <b style="color:var(--red)">${fmt0(alloc.total-alloc.base)} more than your income</b> (${alloc.pct.toFixed(1)}%). Trim category budgets until the total is back under 100% — a budget that assumes money you don't have will fail quietly every month.`
+      :`${fmt0(Math.max(0,alloc.unallocated))} of income (${(100-alloc.pct).toFixed(1)}%) is unallocated. Giving it a job — usually savings, investing, or extra debt payment — is what “every dollar has a name” budgeting means.`}
+    ${alloc.expectedIncome>0?'':` <b>Note:</b> percentages are based on your 3-month average income (≈${fmt0(alloc.avgIncome)}); set the Income row's budget to pin an exact expected income.`}</p>`
+    :`<p class="note">Set the Income row's budget to your expected monthly income (or import a few months of transactions) and percentages will appear here.</p>`}
+  </div>
+  <div class="toolbar" style="margin-top:14px"><button class="btn ghost" id="add-cat">+ Add category</button>
+    <div class="spacer"></div><label>Savings target</label><input type="number" id="sv-target" min="0" max="100" value="${S.settings.savingsTarget}" style="width:70px"> <label>% of income</label></div>
+  <h3>Income timing</h3>
+  <div class="card">
+    <label style="display:flex;align-items:center;gap:8px;color:var(--ink);font-size:.88rem">
+      <input type="checkbox" id="ps-on" ${S.settings.paydayShift.enabled?'checked':''}>
+      Count income dated on or after day
+      <input type="number" id="ps-day" min="15" max="31" value="${S.settings.paydayShift.fromDay}" style="width:64px" ${S.settings.paydayShift.enabled?'':'disabled'}>
+      of the month toward the <b>next</b> month's budget
+    </label>
+    <p class="note" style="margin-top:8px">For paychecks that arrive around the 30th but pay for next month. Applies only to transactions categorized as Income, including ones already imported. Override any single transaction with the “Budget mo.” control on the Transactions tab.</p>
+  </div>
+  <h3>Rules (${S.rules.length})</h3>
+  <p class="note" style="margin-bottom:10px">Checked <b>top to bottom</b> — the first rule that matches wins, so put specific rules (like your payroll) <i>above</i> generic ones (like MORTGAGE). Use ⤒ to send a rule straight to the top.</p>
+  <div class="card" style="margin-bottom:14px">
+    <h3 style="margin-top:0">Test a description</h3>
+    <input type="text" id="rule-test" placeholder="Paste a transaction description, e.g. DHI MORTGAGE PAYROLL" style="width:100%;font-family:var(--mono)">
+    <p class="note" id="rule-test-out" style="margin-top:8px">Type above to see which rule would catch it.</p>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="toolbar" style="margin-bottom:0">
+      <input type="text" id="nr-pattern" placeholder="If description contains…" style="font-family:var(--mono);flex:1;min-width:180px">
+      <select id="nr-cat">${S.categories.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+      <button class="btn" id="nr-add">Add rule</button>
+    </div>
+    <p class="note" style="margin-top:8px">Matching ignores upper/lower case. Duplicates are blocked automatically.</p>
+  </div>
+  <div class="card" style="padding:0;overflow-x:auto"><table><thead><tr><th style="width:110px">Priority</th><th>If description contains…</th><th>Categorize as</th><th></th></tr></thead><tbody>
+  ${S.rules.map((r,i)=>`<tr data-rid="${r.id}">
+    <td style="white-space:nowrap">
+      <button class="btn ghost small r-top" title="Send to top" ${i===0?'disabled':''}>⤒</button>
+      <button class="btn ghost small r-up" title="Move up" ${i===0?'disabled':''}>↑</button>
+      <button class="btn ghost small r-down" title="Move down" ${i===S.rules.length-1?'disabled':''}>↓</button>
+    </td>
+    <td><input type="text" class="r-pattern" value="${esc(r.pattern)}" style="font-family:var(--mono);width:100%;min-width:160px"></td>
+    <td><select class="r-cat">${S.categories.map(c=>`<option value="${c.id}" ${c.id===r.categoryId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></td>
+    <td><button class="btn danger small r-del">delete</button></td></tr>`).join('')}
+  ${S.rules.length?'':'<tr><td colspan="4" class="empty">No rules yet — add one above or from the Transactions tab.</td></tr>'}
+  </tbody></table></div>
+  <div class="toolbar" style="margin-top:14px">
+    <button class="btn ghost" id="r-apply-uncat">Apply rules to uncategorized</button>
+    <button class="btn ghost" id="r-apply-all">Re-run rules on ALL transactions…</button>
+  </div>
+  <p class="note">“Re-run on ALL” recategorizes every transaction from the current rules — useful after fixing a bad rule, but it overwrites any categories you set by hand.</p>`;
+  m.querySelectorAll('tr[data-id]').forEach(tr=>{
+    const c=S.categories.find(x=>x.id===tr.dataset.id);
+    tr.querySelector('.c-name').onchange=e=>{c.name=e.target.value.trim()||c.name;save();};
+    tr.querySelector('.c-kind').onchange=e=>{c.kind=e.target.value;save();render();};
+    tr.querySelector('.c-budget').onchange=e=>{c.budget=Math.max(0,+e.target.value||0);save();render();};
+    tr.querySelector('.c-del').onclick=()=>{
+      const used=S.transactions.filter(t=>t.categoryId===c.id).length;
+      if(!confirm(`Delete “${c.name}”?${used?` ${used} transactions will become uncategorized.`:''}`))return;
+      S.transactions.forEach(t=>{if(t.categoryId===c.id)t.categoryId=null;});
+      S.rules=S.rules.filter(r=>r.categoryId!==c.id);
+      S.categories=S.categories.filter(x=>x.id!==c.id);save();render();};
+  });
+  m.querySelectorAll('tr[data-rid]').forEach(tr=>{
+    const r=S.rules.find(x=>x.id===tr.dataset.rid);
+    tr.querySelector('.r-pattern').onchange=e=>{
+      const v=e.target.value.trim();
+      if(!v){e.target.value=r.pattern;toast('Rule text can\'t be empty.');return;}
+      const dup=S.rules.find(x=>x.id!==r.id&&normPat(x.pattern)===normPat(v));
+      if(dup){e.target.value=r.pattern;toast(`Duplicate — “${dup.pattern}” already exists (→ ${catById(dup.categoryId)?.name||'?'}).`);return;}
+      r.pattern=v;save();toast('Rule updated.');};
+    tr.querySelector('.r-cat').onchange=e=>{r.categoryId=e.target.value;save();toast('Rule updated.');};
+    tr.querySelector('.r-top').onclick=()=>{S.rules=S.rules.filter(x=>x.id!==r.id);S.rules.unshift(r);save();render();};
+    tr.querySelector('.r-up').onclick=()=>{moveRule(r.id,-1);save();render();};
+    tr.querySelector('.r-down').onclick=()=>{moveRule(r.id,1);save();render();};
+    tr.querySelector('.r-del').onclick=()=>{S.rules=S.rules.filter(x=>x.id!==r.id);save();render();};
+  });
+  $('#nr-add').onclick=()=>{
+    const res=addRule($('#nr-pattern').value,$('#nr-cat').value);
+    if(!res.ok){toast(res.msg);return;}
+    save();toast('Rule added at the top.');render();};
+  $('#nr-pattern').onkeydown=e=>{if(e.key==='Enter')$('#nr-add').click();};
+  const testOut=$('#rule-test-out');
+  $('#rule-test').oninput=e=>{
+    const v=e.target.value.trim();
+    if(!v){testOut.innerHTML='Type above to see which rule would catch it.';return;}
+    const r=findRuleMatch(v);
+    testOut.innerHTML=r
+      ?`Matches rule <b style="font-family:var(--mono)">${esc(r.pattern)}</b> → <b>${esc(catById(r.categoryId)?.name||'?')}</b>. ${(()=>{const later=S.rules.filter(x=>x.id!==r.id&&v.toUpperCase().includes(normPat(x.pattern)));return later.length?`Also matched by ${later.length} lower rule${later.length===1?'':'s'} (${later.slice(0,3).map(x=>esc(x.pattern)).join(', ')}) — order decides the winner.`:'';})()}`
+      :'No rule matches — this would land as <b>uncategorized</b>.';};
+  $('#r-apply-uncat').onclick=()=>{let n=0;for(const t of S.transactions){if(!t.categoryId){const c=applyRules(t.desc);if(c){t.categoryId=c;n++;}}}save();toast(`Categorized ${n} uncategorized transaction${n===1?'':'s'}.`);render();};
+  $('#r-apply-all').onclick=()=>{
+    if(!confirm('Re-run rules on ALL transactions? Manual category choices will be overwritten where a rule matches.'))return;
+    let n=0;for(const t of S.transactions){const c=applyRules(t.desc);if(c&&c!==t.categoryId){t.categoryId=c;n++;}}
+    save();toast(`Recategorized ${n} transaction${n===1?'':'s'} from the current rules.`);render();};
+  $('#add-cat').onclick=()=>{S.categories.push({id:uid(),name:'New category',kind:'spending',budget:0});save();render();};
+  $('#sv-target').onchange=e=>{S.settings.savingsTarget=Math.min(100,Math.max(0,+e.target.value||0));save();};
+  $('#ps-on').onchange=e=>{S.settings.paydayShift.enabled=e.target.checked;save();toast(e.target.checked?'End-of-month income now counts toward the next month.':'Income timing shift turned off.');render();};
+  $('#ps-day').onchange=e=>{S.settings.paydayShift.fromDay=Math.min(31,Math.max(15,+e.target.value||25));save();render();};
+}
+
+/* ---- Plan ---- */
+function rPlan(m){
+  const ms=allMonths();
+  if(!ms.length){m.innerHTML=`<h2>Plan</h2><div class="empty">Import a month or two of transactions and the plan builds itself.</div>`;return;}
+  const mk=ms[ms.length-1];
+  const c=computeMonth(mk);
+  const hist=ms.slice(-3).map(computeMonth);
+  const avg=f=>hist.reduce((a,x)=>a+f(x),0)/hist.length;
+  const spendCats=S.categories.filter(x=>x.kind==='spending');
+  const rows=spendCats.map(cat=>({cat,spent:c.byCat[cat.id]||0,avg3:hist.reduce((a,h)=>a+(h.byCat[cat.id]||0),0)/hist.length}));
+  const overs=rows.filter(r=>r.cat.budget>0&&r.spent>r.cat.budget).sort((a,b)=>(b.spent-b.cat.budget)-(a.spent-a.cat.budget));
+  const overTotal=overs.reduce((a,r)=>a+(r.spent-r.cat.budget),0);
+  const target=S.settings.savingsTarget;
+  const gap=c.income>0?Math.max(0,(target/100)*c.income-(c.savings+c.investing)):0;
+  const subs=rows.find(r=>r.cat.name.toLowerCase().includes('subscription'));
+  const top3=rows.filter(r=>r.avg3>0).sort((a,b)=>b.avg3-a.avg3).slice(0,3);
+  const ins=[];
+  if(c.uncategorized)ins.push(['gold','Finish categorizing first',`<span class="m">${c.uncategorized}</span> transactions in ${monthLabel(mk)} are uncategorized, so these numbers are incomplete. Use “Apply rules” on the Transactions tab, then fix the rest by hand.`]);
+  if(overs.length){ins.push(['red',`Over budget in ${overs.length} categor${overs.length===1?'y':'ies'} — ${fmt0(overTotal)} total`,
+    overs.slice(0,5).map(r=>`<b>${esc(r.cat.name)}</b>: ${fmt0(r.spent)} vs ${fmt0(r.cat.budget)} budget (<span class="m">+${fmt0(r.spent-r.cat.budget)}</span>)`).join(' · ')+`. Bringing just these back to budget frees <span class="m">${fmt0(overTotal)}/mo</span>.`]);}
+  else ins.push(['green','All budgeted categories are within budget','Nice — the fastest path to improvement now is raising your savings target, not cutting further.']);
+  if(c.income>0){
+    if(c.savingsRate>=target)ins.push(['green',`Savings rate ${c.savingsRate.toFixed(1)}% — at or above your ${target}% target`,`You saved or invested ${fmt0(c.savings+c.investing)} of ${fmt0(c.income)} income in ${monthLabel(mk)}.`]);
+    else ins.push(['gold',`Savings rate ${c.savingsRate.toFixed(1)}% — ${fmt0(gap)}/mo short of your ${target}% target`,
+      `A common guideline is 50/30/20: about 50% of take-home to needs, 30% to wants, 20% to saving and debt beyond minimums. ${overTotal>0?`Your current over-budget spending (${fmt0(overTotal)}) would cover ${Math.min(100,100*overTotal/gap).toFixed(0)}% of the gap.`:'Look at the three categories below for room.'}`]);
+  }
+  if(c.leftover>50)ins.push(['blue',`${fmt0(c.leftover)} left unassigned in ${monthLabel(mk)}`,`Money that isn't deliberately saved tends to get absorbed. Consider an automatic transfer of ${fmt0(Math.floor(c.leftover/50)*50)} to savings or investing right after payday.`]);
+  if(c.leftover<-50)ins.push(['red',`Outflows exceeded income by ${fmt0(-c.leftover)}`,`Spending + saving + debt payments were more than income in ${monthLabel(mk)}. Check for one-time items, or whether a transfer between your own accounts is miscategorized (mark those as Transfer).`]);
+  if(subs&&subs.avg3>0)ins.push(['blue',`Subscriptions run about ${fmt0(subs.avg3)}/mo`,`That's ${fmt0(subs.avg3*12)}/yr. Worth a five-minute audit — canceling even one or two usually sticks, because it requires no ongoing willpower.`]);
+  if(c.debt>0)ins.push(['green',`Debt payments: ${fmt0(c.debt)} in ${monthLabel(mk)}`,`If you free up money above, the two classic orders are highest-interest-first (cheapest mathematically) or smallest-balance-first (best for momentum). Either works — the one you'll stick with wins.`]);
+
+  m.innerHTML=`
+  <h2>Plan</h2><p class="sub">Built from your last ${hist.length} month${hist.length===1?'':'s'} of data. General guidelines, not financial advice.</p>
+  ${ins.map(([cls,t,p])=>`<div class="insight ${cls}"><div class="t">${t}</div><p>${p}</p></div>`).join('')}
+  <div class="card" style="margin-top:20px"><h3>Your three biggest spending levers (3-month average)</h3>
+  <table><thead><tr><th>Category</th><th class="num">Avg / month</th><th class="num">This month</th><th class="num">10% trim frees</th></tr></thead><tbody>
+  ${top3.map(r=>`<tr><td>${esc(r.cat.name)}</td><td class="num">${fmt0(r.avg3)}</td><td class="num">${fmt0(r.spent)}</td><td class="num pos">${fmt0(r.avg3*.1)}/mo</td></tr>`).join('')}
+  </tbody></table>
+  <p class="note" style="margin-top:10px">Small percentage cuts in big categories beat heroic cuts in small ones. A 10% trim across these three frees about <b>${fmt0(top3.reduce((a,r)=>a+r.avg3*.1,0))}/mo</b> — ${fmt0(top3.reduce((a,r)=>a+r.avg3*.1,0)*12)} a year toward savings or debt.</p></div>`;
+}
+
+/* ---- Debt Plan ---- */
+function rDebt(m){
+  const curMk=currentMonthKey();
+  const hist=[1,2,3].map(i=>shiftMonth(curMk,-i)).map(computeMonth);
+  const histMonths=hist.filter(h=>h.txCount>0).length;
+  const avgDebtPay=histMonths?hist.reduce((a,h)=>a+h.debt,0)/histMonths:0;
+  const totalMin=S.debts.reduce((a,d)=>a+(+d.minPayment||0),0);
+  const totalBal=S.debts.reduce((a,d)=>a+(+d.balance||0),0);
+  const extra=+S.debtPlan.extra||0;
+  const snow=simulatePayoff(S.debts,extra,'snowball');
+  const aval=simulatePayoff(S.debts,extra,'avalanche');
+  const base=simulatePayoff(S.debts,0,'avalanche');
+  const dateOf=n=>monthLabel(shiftMonth(curMk,n));
+  const stuck=!snow.finished||!aval.finished;
+
+  m.innerHTML=`
+  <h2>Debt Plan</h2>
+  <p class="sub">Enter each debt's current balance, APR, and minimum payment. Both classic strategies are simulated side by side — general math, not financial advice.</p>
+  <div class="card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Debt</th><th class="num">Balance</th><th class="num">APR %</th><th class="num">Min / mo</th><th></th></tr></thead><tbody>
+  ${S.debts.map(d=>`<tr data-did="${d.id}">
+    <td><input type="text" class="d-name" value="${esc(d.name)}" style="width:170px"></td>
+    <td class="num"><input type="number" class="d-bal" min="0" step="50" value="${d.balance}"></td>
+    <td class="num"><input type="number" class="d-apr" min="0" max="100" step="0.1" value="${d.apr}" style="width:80px"></td>
+    <td class="num"><input type="number" class="d-min" min="0" step="5" value="${d.minPayment}"></td>
+    <td><button class="btn danger small d-del">delete</button></td></tr>`).join('')}
+  ${S.debts.length?`<tr><td style="font-weight:600">Total</td><td class="num" style="font-weight:600">${fmt0(totalBal)}</td><td></td><td class="num" style="font-weight:600">${fmt0(totalMin)}</td><td></td></tr>`
+    :'<tr><td colspan="5" class="empty">No debts entered yet — add your credit cards, loans, and car note below.</td></tr>'}
+  </tbody></table></div>
+  <div class="toolbar" style="margin-top:14px">
+    <button class="btn ghost" id="d-add">+ Add debt</button>
+    <div class="spacer"></div>
+    <label>Extra toward debt</label><input type="number" id="d-extra" min="0" step="25" value="${extra}"> <label>/mo beyond minimums</label>
+  </div>
+  ${avgDebtPay>totalMin+1?`<p class="note">Hint: your transactions show ≈${fmt0(avgDebtPay)}/mo going to Debt Payment lately — about ${fmt0(avgDebtPay-totalMin)} above these minimums, if you want a realistic “extra”.</p>`:''}
+  ${S.debts.length?`
+  ${stuck?`<div class="insight red"><div class="t">These payments never finish</div><p>At least one debt's minimum doesn't cover its monthly interest, so the balance grows forever. Increase the minimums or the extra amount.</p></div>`:`
+  <div class="grid g2" style="margin-top:8px">
+    ${[['Snowball — smallest balance first',snow,'Quick wins: each payoff frees its minimum for the next debt.'],
+       ['Avalanche — highest APR first',aval,'Cheapest mathematically: attacks the most expensive interest.']].map(([title,sim,desc])=>`
+    <div class="card"><h3 style="margin-top:0">${title}</h3><p class="note" style="margin-bottom:10px">${desc}</p>
+      <div class="st-row" style="border-bottom:1px dashed var(--line)"><span class="k">Debt-free</span><span class="v" style="font-family:var(--mono)">${dateOf(sim.months)} (${sim.months} mo)</span></div>
+      <div class="st-row" style="border-bottom:1px dashed var(--line)"><span class="k">Total interest</span><span class="v neg" style="font-family:var(--mono)">${fmt0(sim.totalInterest)}</span></div>
+      <table style="margin-top:10px"><thead><tr><th>Payoff order</th><th class="num">Paid off</th><th class="num">Interest</th></tr></thead><tbody>
+      ${[...sim.debts].sort((a,b)=>a.paidOffMonth-b.paidOffMonth).map((d,i)=>`<tr><td>${i+1}. ${esc(d.name)}</td><td class="num">${dateOf(d.paidOffMonth).replace(' 20',' ’')}</td><td class="num">${fmt0(d.interest)}</td></tr>`).join('')}
+      </tbody></table></div>`).join('')}
+  </div>
+  <div class="card" style="margin-top:16px"><h3 style="margin-top:0">The verdict</h3>
+    <p style="font-size:.9rem">${aval.totalInterest<snow.totalInterest-1
+      ?`Avalanche saves <b style="font-family:var(--mono)">${fmt0(snow.totalInterest-aval.totalInterest)}</b> in interest${aval.months<snow.months?` and finishes ${snow.months-aval.months} month${snow.months-aval.months===1?'':'s'} sooner`:''}. Snowball's first payoff comes in <b>${Math.min(...snow.debts.map(d=>d.paidOffMonth))} month${Math.min(...snow.debts.map(d=>d.paidOffMonth))===1?'':'s'}</b> vs avalanche's ${Math.min(...aval.debts.map(d=>d.paidOffMonth))} — worth it if early wins keep you going. The plan you'll stick with is the right one.`
+      :`With these debts the two strategies come out essentially even (${fmt0(Math.abs(snow.totalInterest-aval.totalInterest))} apart) — pick snowball for the earlier win.`}
+    ${extra>0&&base.finished?` Your ${fmt0(extra)}/mo extra saves <b style="font-family:var(--mono)">${fmt0(base.totalInterest-aval.totalInterest)}</b> in interest and gets you debt-free <b>${base.months-aval.months} months sooner</b> than minimums only.`:extra===0&&base.finished?` Add an “extra” amount above to see how much faster this could go.`:''}</p></div>
+  <div class="card" style="margin-top:16px"><h3 style="margin-top:0">Balance over time</h3><div class="chart-box"><canvas id="debt-chart"></canvas></div></div>`}`:''}`;
+
+  m.querySelectorAll('tr[data-did]').forEach(tr=>{
+    const d=S.debts.find(x=>x.id===tr.dataset.did);
+    const num=(cls,key,max)=>{tr.querySelector(cls).onchange=e=>{d[key]=Math.max(0,Math.min(max,+e.target.value||0));save();render();};};
+    tr.querySelector('.d-name').onchange=e=>{d.name=e.target.value.trim()||d.name;save();};
+    num('.d-bal','balance',1e9);num('.d-apr','apr',100);num('.d-min','minPayment',1e7);
+    tr.querySelector('.d-del').onclick=()=>{if(!confirm(`Remove “${d.name}” from the plan?`))return;S.debts=S.debts.filter(x=>x.id!==d.id);save();render();};
+  });
+  $('#d-add').onclick=()=>{S.debts.push({id:uid(),name:'New debt',balance:1000,apr:20,minPayment:35});save();render();};
+  $('#d-extra').onchange=e=>{S.debtPlan.extra=Math.max(0,+e.target.value||0);save();render();};
+  if(S.debts.length&&!stuck&&document.getElementById('debt-chart')){
+    const maxM=Math.max(snow.months,aval.months);
+    const step=maxM>120?6:(maxM>48?3:1);
+    const labels=[],sd=[],ad=[];
+    for(let i=0;i<=maxM;i+=step){labels.push(i);sd.push(snow.series[Math.min(i,snow.series.length-1)][1]);ad.push(aval.series[Math.min(i,aval.series.length-1)][1]);}
+    charts.push(new Chart($('#debt-chart'),{type:'line',
+      data:{labels,datasets:[
+        {label:'Snowball',data:sd,borderColor:'#1E5B45',backgroundColor:'#1E5B45',tension:.2,pointRadius:0},
+        {label:'Avalanche',data:ad,borderColor:'#2C5B8F',backgroundColor:'#2C5B8F',tension:.2,pointRadius:0}]},
+      options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,font:{size:11}}}},
+        scales:{y:{ticks:{callback:v=>'$'+(+v).toLocaleString()}},x:{title:{display:true,text:'months from now',font:{size:11}}}}}}));
+  }
+}
+
+/* ---- Settings / Accounts / Backup ---- */
+function rSettings(m){
+  const types=[['checking','Checking'],['savings','Savings'],['investment','Investment'],['debt','Debt / loan / card']];
+  m.innerHTML=`
+  <h2>Accounts &amp; Backup</h2><p class="sub">One entry per real-world account — e.g. two checking accounts, one savings, Robinhood, 401k.</p>
+  <div class="card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Account</th><th>Type</th><th class="num">Transactions</th><th></th></tr></thead><tbody>
+  ${S.accounts.map(a=>`<tr data-id="${a.id}">
+    <td><input type="text" class="a-name" value="${esc(a.name)}" style="width:200px"></td>
+    <td><select class="a-type">${types.map(([v,l])=>`<option value="${v}" ${v===a.type?'selected':''}>${l}</option>`).join('')}</select></td>
+    <td class="num">${S.transactions.filter(t=>t.accountId===a.id).length}</td>
+    <td><button class="btn danger small a-del">delete</button></td></tr>`).join('')}
+  ${S.accounts.length?'':'<tr><td colspan="4" class="empty">No accounts yet.</td></tr>'}
+  </tbody></table></div>
+  <div class="toolbar" style="margin-top:14px"><button class="btn" id="add-acct">+ Add account</button></div>
+  <h3>Backup</h3>
+  <div class="toolbar">
+    <button class="btn ghost" id="exp">Export everything (JSON)</button>
+    <button class="btn ghost" id="imp-btn">Restore from backup</button>
+    <input type="file" id="imp-json" accept=".json,application/json" style="display:none">
+    <div class="spacer"></div>
+    <button class="btn danger" id="wipe">Erase all data</button>
+  </div>
+  <p class="note">Everything lives in this browser's storage. Export a backup after each monthly session; clearing browser data would otherwise erase it.</p>`;
+  $('#add-acct').onclick=()=>{S.accounts.push({id:uid(),name:'New account',type:'checking'});save();render();};
+  m.querySelectorAll('tr[data-id]').forEach(tr=>{
+    const a=S.accounts.find(x=>x.id===tr.dataset.id);
+    tr.querySelector('.a-name').onchange=e=>{a.name=e.target.value.trim()||a.name;save();};
+    tr.querySelector('.a-type').onchange=e=>{a.type=e.target.value;save();};
+    tr.querySelector('.a-del').onclick=()=>{
+      const n=S.transactions.filter(t=>t.accountId===a.id).length;
+      if(!confirm(`Delete “${a.name}”${n?` and its ${n} transactions`:''}?`))return;
+      S.transactions=S.transactions.filter(t=>t.accountId!==a.id);
+      delete S.mappings[a.id];
+      S.accounts=S.accounts.filter(x=>x.id!==a.id);save();render();};
+  });
+  $('#exp').onclick=()=>{
+    const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download=`ledgerline-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);};
+  $('#imp-btn').onclick=()=>$('#imp-json').click();
+  $('#imp-json').onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=()=>{try{const d=JSON.parse(r.result);
+      if(!d.categories||!d.transactions)throw 0;
+      if(!confirm(`Replace current data with this backup (${d.transactions.length} transactions)?`))return;
+      S=d;if(!S.settings)S.settings={savingsTarget:20};save();toast('Backup restored.');render();
+    }catch{toast('That file is not a Ledgerline backup.');}};
+    r.readAsText(f);};
+  $('#wipe').onclick=()=>{if(!confirm('Erase ALL Ledgerline data from this browser? Export a backup first if unsure.'))return;S=freshState();save();render();};
+}
+
+/* ============ BOOT ============ */
+document.getElementById('nav').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-view]');if(!b)return;
+  view=b.dataset.view;pending=null;render();
+});
+document.addEventListener('click',e=>{document.querySelectorAll('details.act[open]').forEach(d=>{if(!d.contains(e.target))d.open=false;});});
+window.addEventListener('scroll',()=>{document.querySelectorAll('details.act[open]').forEach(d=>d.open=false);},true);
+load();render();
+</script>
+<footer>Ledgerline stores everything in this browser's local storage on your machine. Nothing is uploaded anywhere. Use Accounts &amp; Backup → Export to keep a backup file. Educational tool — not financial advice.</footer>
+</body>
+</html>
